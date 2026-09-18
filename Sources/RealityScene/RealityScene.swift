@@ -140,6 +140,7 @@ public struct RealitySceneView: View {
                         selectedNodeName = value.entity.name
                     }
             )
+            .realityViewCameraControls(.orbit)
             .accessibilityIdentifier("realityScene.root")
 
             if let selectedNodeName {

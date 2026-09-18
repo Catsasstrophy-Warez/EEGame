@@ -10,9 +10,12 @@ public struct Rev72IntegratedLabView: View {
     @State private var showRealityScene = false
     private let scopeSampleCount = 160
     private let scopeSampleRateHz = 30.0
-    private let scopeVoltageScale = 30.0
-    private let scopeCurrentScale = 1.0
+    private let scopeMinVoltageRange = 1.0
+    private let scopeMinCurrentRange = 0.05
     private let scopeGridHorizontalDivisions = 8
+    /// Raw (unnormalized) volt/amp history — normalization for the Metal
+    /// view happens per-frame in `scopeVoltageRange`/`scopeCurrentRange` so
+    /// the axis auto-ranges to whatever the signal is actually doing.
     @State private var scopeVoltageBuffer = TelemetryRingBuffer(capacity:160)
     @State private var scopeCurrentBuffer = TelemetryRingBuffer(capacity:160)
     @State private var simulation = EESimulationCoordinator75()
@@ -77,28 +80,45 @@ public struct Rev72IntegratedLabView: View {
         .background(.black.opacity(0.38))
     }
 
+    /// Auto-ranged, symmetric-about-zero full-scale value for a channel:
+    /// the largest magnitude currently in the buffer, padded 10%, floored at
+    /// `minimumRange` so a flat/near-zero signal doesn't collapse to a
+    /// razor-thin trace.
+    private func autoRange(_ values: [Float], minimumRange: Double) -> Double {
+        let peak = values.reduce(0) { max($0, abs($1)) }
+        return max(Double(peak) * 1.1, minimumRange)
+    }
+
+    private func normalized(_ values: [Float], by range: Double) -> [Float] {
+        guard range > 0 else { return values }
+        return values.map { Float(min(max(Double($0) / range, -1), 1)) }
+    }
+
+    private var scopeVoltageRange: Double { autoRange(scopeVoltageBuffer.values,minimumRange:scopeMinVoltageRange) }
+    private var scopeCurrentRange: Double { autoRange(scopeCurrentBuffer.values,minimumRange:scopeMinCurrentRange) }
+
     private var scopeTimebaseLabel: String {
         let windowSeconds = Double(scopeSampleCount) / scopeSampleRateHz
         let perDivisionMs = windowSeconds / Double(scopeGridHorizontalDivisions) * 1000
-        return String(format:"%.0f ms/div   %.0fV / %.1fA full scale",perDivisionMs,scopeVoltageScale,scopeCurrentScale)
+        return String(format:"%.0f ms/div   AUTO %.2fV / %.2fA",perDivisionMs,scopeVoltageRange,scopeCurrentRange)
     }
 
     private var scopeAxisOverlay: some View {
         HStack {
             VStack {
-                Text(String(format:"+%.0fV",scopeVoltageScale))
+                Text(String(format:"+%.2fV",scopeVoltageRange))
                 Spacer()
                 Text("0V")
                 Spacer()
-                Text(String(format:"-%.0fV",scopeVoltageScale))
+                Text(String(format:"-%.2fV",scopeVoltageRange))
             }.foregroundStyle(Color(red:0.2,green:0.85,blue:1.0))
             Spacer()
             VStack {
-                Text(String(format:"+%.1fA",scopeCurrentScale))
+                Text(String(format:"+%.2fA",scopeCurrentRange))
                 Spacer()
                 Text("0A")
                 Spacer()
-                Text(String(format:"-%.1fA",scopeCurrentScale))
+                Text(String(format:"-%.2fA",scopeCurrentRange))
             }.foregroundStyle(Color(red:1.0,green:0.65,blue:0.15))
         }
         .font(.system(size:7,weight:.semibold,design:.monospaced))
@@ -181,12 +201,12 @@ public struct Rev72IntegratedLabView: View {
                     TimelineView(.animation(minimumInterval:1.0/30.0)) { timeline in
                         ZStack {
                             TelemetryWaveformView(traces:[
-                                .init(samples:scopeVoltageBuffer.values,color:[0.2,0.85,1.0,1.0]),
-                                .init(samples:scopeCurrentBuffer.values,color:[1.0,0.65,0.15,1.0])
+                                .init(samples:normalized(scopeVoltageBuffer.values,by:scopeVoltageRange),color:[0.2,0.85,1.0,1.0]),
+                                .init(samples:normalized(scopeCurrentBuffer.values,by:scopeCurrentRange),color:[1.0,0.65,0.15,1.0])
                             ])
                             .onChange(of:timeline.date) { _,_ in
-                                scopeVoltageBuffer.append(Float(min(max(simulation.snapshot.terminalVoltage/scopeVoltageScale,-1),1)))
-                                scopeCurrentBuffer.append(Float(min(max(simulation.snapshot.currentA/scopeCurrentScale,-1),1)))
+                                scopeVoltageBuffer.append(Float(simulation.snapshot.terminalVoltage))
+                                scopeCurrentBuffer.append(Float(simulation.snapshot.currentA))
                             }
                             scopeAxisOverlay
                         }
