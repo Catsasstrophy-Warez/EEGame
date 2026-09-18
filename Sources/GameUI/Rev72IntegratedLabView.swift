@@ -8,6 +8,11 @@ import MetalTelemetry
 public struct Rev72IntegratedLabView: View {
     @State private var runtime = EEIntegratedLabRuntime72()
     @State private var showRealityScene = false
+    private let scopeSampleCount = 160
+    private let scopeSampleRateHz = 30.0
+    private let scopeVoltageScale = 30.0
+    private let scopeCurrentScale = 1.0
+    private let scopeGridHorizontalDivisions = 8
     @State private var scopeVoltageBuffer = TelemetryRingBuffer(capacity:160)
     @State private var scopeCurrentBuffer = TelemetryRingBuffer(capacity:160)
     @State private var simulation = EESimulationCoordinator75()
@@ -70,6 +75,35 @@ public struct Rev72IntegratedLabView: View {
             }
         }.padding(12)
         .background(.black.opacity(0.38))
+    }
+
+    private var scopeTimebaseLabel: String {
+        let windowSeconds = Double(scopeSampleCount) / scopeSampleRateHz
+        let perDivisionMs = windowSeconds / Double(scopeGridHorizontalDivisions) * 1000
+        return String(format:"%.0f ms/div   %.0fV / %.1fA full scale",perDivisionMs,scopeVoltageScale,scopeCurrentScale)
+    }
+
+    private var scopeAxisOverlay: some View {
+        HStack {
+            VStack {
+                Text(String(format:"+%.0fV",scopeVoltageScale))
+                Spacer()
+                Text("0V")
+                Spacer()
+                Text(String(format:"-%.0fV",scopeVoltageScale))
+            }.foregroundStyle(Color(red:0.2,green:0.85,blue:1.0))
+            Spacer()
+            VStack {
+                Text(String(format:"+%.1fA",scopeCurrentScale))
+                Spacer()
+                Text("0A")
+                Spacer()
+                Text(String(format:"-%.1fA",scopeCurrentScale))
+            }.foregroundStyle(Color(red:1.0,green:0.65,blue:0.15))
+        }
+        .font(.system(size:7,weight:.semibold,design:.monospaced))
+        .padding(4)
+        .accessibilityIdentifier("quickBench.scope.axis")
     }
 
     private var workspacePicker: some View {
@@ -145,21 +179,25 @@ public struct Rev72IntegratedLabView: View {
                 }.accessibilityIdentifier("quickBench.dmm")
                 EEInstrumentPanel75("Oscilloscope",subtitle:"SCOPE-1  •  CH1 VOLTAGE  •  CH2 CURRENT") {
                     TimelineView(.animation(minimumInterval:1.0/30.0)) { timeline in
-                        TelemetryWaveformView(traces:[
-                            .init(samples:scopeVoltageBuffer.values,color:[0.2,0.85,1.0,1.0]),
-                            .init(samples:scopeCurrentBuffer.values,color:[1.0,0.65,0.15,1.0])
-                        ])
-                        .frame(height:90)
-                        .background(.black.opacity(0.7),in:RoundedRectangle(cornerRadius:8))
-                        .onChange(of:timeline.date) { _,_ in
-                            scopeVoltageBuffer.append(Float(min(max(simulation.snapshot.terminalVoltage/30.0,-1),1)))
-                            scopeCurrentBuffer.append(Float(min(max(simulation.snapshot.currentA/1.0,-1),1)))
+                        ZStack {
+                            TelemetryWaveformView(traces:[
+                                .init(samples:scopeVoltageBuffer.values,color:[0.2,0.85,1.0,1.0]),
+                                .init(samples:scopeCurrentBuffer.values,color:[1.0,0.65,0.15,1.0])
+                            ])
+                            .onChange(of:timeline.date) { _,_ in
+                                scopeVoltageBuffer.append(Float(min(max(simulation.snapshot.terminalVoltage/scopeVoltageScale,-1),1)))
+                                scopeCurrentBuffer.append(Float(min(max(simulation.snapshot.currentA/scopeCurrentScale,-1),1)))
+                            }
+                            scopeAxisOverlay
                         }
-                    }.accessibilityIdentifier("quickBench.scope.telemetry")
+                    }
+                    .frame(height:90)
+                    .background(.black.opacity(0.7),in:RoundedRectangle(cornerRadius:8))
+                    .accessibilityIdentifier("quickBench.scope.telemetry")
                     HStack {
                         Text("CH1").foregroundStyle(EEIndustrialPalette.energized)
                         Spacer()
-                        Text("10 ms/div   5 V/div").foregroundStyle(.secondary)
+                        Text(scopeTimebaseLabel).foregroundStyle(.secondary)
                     }.font(.caption2.monospaced())
                 }.accessibilityIdentifier("quickBench.scope")
                 EEInstrumentPanel75("Loop Calibrator",subtitle:"LC-1  •  4–20 mA SOURCE / MEASURE") {

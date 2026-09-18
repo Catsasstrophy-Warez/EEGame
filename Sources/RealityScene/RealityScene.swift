@@ -23,7 +23,21 @@ public enum RealitySceneContent {
         let entity = ModelEntity(mesh: mesh, materials: [material])
         entity.name = name
         entity.position = position
+        entity.generateCollisionShapes(recursive: false)
+        entity.components.set(InputTargetComponent())
         return entity
+    }
+
+    /// Human-readable label for a tapped node, shown in the inspector overlay.
+    public static func displayName(for nodeName: String) -> String {
+        switch nodeName {
+        case sourceName: return "Supply"
+        case breakerName: return "Breaker"
+        case loadName: return "Load"
+        case wireSourceToBreakerName: return "Supply → Breaker"
+        case wireBreakerToLoadName: return "Breaker → Load"
+        default: return nodeName
+        }
     }
 
     /// Builds the source -> breaker -> load row with connecting wire
@@ -94,6 +108,8 @@ public struct RealitySceneView: View {
     public var voltage: Double
     public var referenceVoltage: Double
 
+    @State private var selectedNodeName: String?
+
     public init(energized: Bool = false, voltage: Double = 0, referenceVoltage: Double = 30) {
         self.energized = energized
         self.voltage = voltage
@@ -101,22 +117,55 @@ public struct RealitySceneView: View {
     }
 
     public var body: some View {
-        RealityView { content in
-            let row = RealitySceneContent.buildCircuitRow()
-            RealitySceneContent.applyElectricalState(to: row, energized: energized, voltage: voltage, referenceVoltage: referenceVoltage)
-            content.add(row)
+        ZStack(alignment: .bottom) {
+            RealityView { content in
+                let row = RealitySceneContent.buildCircuitRow()
+                RealitySceneContent.applyElectricalState(to: row, energized: energized, voltage: voltage, referenceVoltage: referenceVoltage)
+                content.add(row)
 
-            var pointLight = PointLightComponent()
-            pointLight.intensity = 2000
-            let light = Entity()
-            light.components.set(pointLight)
-            light.position = [0, 0.5, 0.5]
-            content.add(light)
-        } update: { content, _ in
-            guard let row = content.entities.first(where: { $0.name == "CircuitRow" }) else { return }
-            RealitySceneContent.applyElectricalState(to: row, energized: energized, voltage: voltage, referenceVoltage: referenceVoltage)
+                var pointLight = PointLightComponent()
+                pointLight.intensity = 2000
+                let light = Entity()
+                light.components.set(pointLight)
+                light.position = [0, 0.5, 0.5]
+                content.add(light)
+            } update: { content, _ in
+                guard let row = content.entities.first(where: { $0.name == "CircuitRow" }) else { return }
+                RealitySceneContent.applyElectricalState(to: row, energized: energized, voltage: voltage, referenceVoltage: referenceVoltage)
+            }
+            .gesture(
+                SpatialTapGesture()
+                    .targetedToAnyEntity()
+                    .onEnded { value in
+                        selectedNodeName = value.entity.name
+                    }
+            )
+            .accessibilityIdentifier("realityScene.root")
+
+            if let selectedNodeName {
+                inspector(for: selectedNodeName)
+            }
         }
-        .accessibilityIdentifier("realityScene.root")
+    }
+
+    @ViewBuilder
+    private func inspector(for nodeName: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(RealitySceneContent.displayName(for: nodeName))
+                .font(.system(size: 13, weight: .bold, design: .rounded))
+            if nodeName == RealitySceneContent.sourceName || nodeName == RealitySceneContent.breakerName {
+                Text(energized ? "Energized" : "De-energized")
+                    .font(.system(size: 11, design: .monospaced))
+            } else {
+                Text(String(format: "%.2f V", voltage))
+                    .font(.system(size: 11, design: .monospaced))
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 8))
+        .padding(12)
+        .accessibilityIdentifier("realityScene.inspector")
     }
 }
 #endif
