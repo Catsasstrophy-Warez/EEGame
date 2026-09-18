@@ -1,0 +1,12 @@
+# Xcode / XcodeGen (project.yml generates this locally — do not commit)
+*.xcodeproj/
+*.xcworkspace/
+DerivedData/
+xcuserdata/
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# macOS
+.DS_Store
