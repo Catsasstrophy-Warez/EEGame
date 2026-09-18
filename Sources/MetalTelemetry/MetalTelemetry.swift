@@ -58,6 +58,9 @@ public struct TelemetryTrace: Sendable {
 public final class TelemetryWaveformRenderer: NSObject, MTKViewDelegate {
     public let device: MTLDevice
     public var traces: [TelemetryTrace] = []
+    public var showGrid = true
+    public var gridColor: SIMD4<Float> = [1, 1, 1, 0.08]
+    public var gridDivisions: (horizontal: Int, vertical: Int) = (8, 4)
 
     private let commandQueue: MTLCommandQueue
     private let pipelineState: MTLRenderPipelineState
@@ -74,6 +77,13 @@ public final class TelemetryWaveformRenderer: NSObject, MTKViewDelegate {
         descriptor.vertexFunction = vertexFunction
         descriptor.fragmentFunction = fragmentFunction
         descriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
+        descriptor.colorAttachments[0].isBlendingEnabled = true
+        descriptor.colorAttachments[0].rgbBlendOperation = .add
+        descriptor.colorAttachments[0].alphaBlendOperation = .add
+        descriptor.colorAttachments[0].sourceRGBBlendFactor = .sourceAlpha
+        descriptor.colorAttachments[0].sourceAlphaBlendFactor = .sourceAlpha
+        descriptor.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
+        descriptor.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
 
         guard let pipelineState = try? device.makeRenderPipelineState(descriptor: descriptor) else { return nil }
 
@@ -94,6 +104,10 @@ public final class TelemetryWaveformRenderer: NSObject, MTKViewDelegate {
         else { return }
 
         encoder.setRenderPipelineState(pipelineState)
+
+        if showGrid {
+            drawGrid(with: encoder)
+        }
 
         for trace in traces where trace.samples.count > 1 {
             let count = trace.samples.count
@@ -118,6 +132,33 @@ public final class TelemetryWaveformRenderer: NSObject, MTKViewDelegate {
         encoder.endEncoding()
         commandBuffer.present(drawable)
         commandBuffer.commit()
+    }
+
+    /// Draws a scope-style reticle as disconnected line segments (a `.line`
+    /// primitive list, not the traces' `.lineStrip`).
+    private func drawGrid(with encoder: MTLRenderCommandEncoder) {
+        var vertices: [Float] = []
+        let (h, v) = gridDivisions
+
+        for i in 0...h {
+            let x = Float(i) / Float(h) * 2 - 1
+            vertices.append(contentsOf: [x, -1, x, 1])
+        }
+        for i in 0...v {
+            let y = Float(i) / Float(v) * 2 - 1
+            vertices.append(contentsOf: [-1, y, 1, y])
+        }
+
+        guard let vertexBuffer = device.makeBuffer(
+            bytes: vertices,
+            length: vertices.count * MemoryLayout<Float>.stride,
+            options: [.storageModeShared]
+        ) else { return }
+
+        var color = gridColor
+        encoder.setVertexBuffer(vertexBuffer, offset: 0, index: 0)
+        encoder.setFragmentBytes(&color, length: MemoryLayout<SIMD4<Float>>.stride, index: 0)
+        encoder.drawPrimitives(type: .line, vertexStart: 0, vertexCount: vertices.count / 2)
     }
 }
 
