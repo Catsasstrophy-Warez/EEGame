@@ -129,7 +129,7 @@ public struct RealitySceneView: View {
                 light.components.set(pointLight)
                 light.position = [0, 0.5, 0.5]
                 content.add(light)
-            } update: { content, _ in
+            } update: { content in
                 guard let row = content.entities.first(where: { $0.name == "CircuitRow" }) else { return }
                 RealitySceneContent.applyElectricalState(to: row, energized: energized, voltage: voltage, referenceVoltage: referenceVoltage)
             }
