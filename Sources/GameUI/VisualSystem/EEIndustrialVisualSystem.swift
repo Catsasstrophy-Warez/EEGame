@@ -94,35 +94,6 @@ struct EEDigitalReadout75: View {
     }
 }
 
-@available(iOS 18.0, macOS 15.0, *)
-struct EEWaveform75: View {
-    let phase: Double
-    var body: some View {
-        Canvas { context,size in
-            var grid=Path()
-            for i in 0...8 {
-                let x=size.width*CGFloat(i)/8
-                grid.move(to:.init(x:x,y:0)); grid.addLine(to:.init(x:x,y:size.height))
-            }
-            for i in 0...4 {
-                let y=size.height*CGFloat(i)/4
-                grid.move(to:.init(x:0,y:y)); grid.addLine(to:.init(x:size.width,y:y))
-            }
-            context.stroke(grid,with:.color(.white.opacity(0.08)),lineWidth:0.5)
-            var wave=Path()
-            for i in 0...160 {
-                let x=size.width*CGFloat(i)/160
-                let a=Double(i)/160*Double.pi*5+phase
-                let y=size.height/2-CGFloat(sin(a))*size.height*0.30
-                if i==0 { wave.move(to:.init(x:x,y:y)) } else { wave.addLine(to:.init(x:x,y:y)) }
-            }
-            context.stroke(wave,with:.color(EEIndustrialPalette.energized),lineWidth:2)
-        }
-        .frame(height:86)
-        .background(.black.opacity(0.45),in:RoundedRectangle(cornerRadius:8))
-        .overlay(RoundedRectangle(cornerRadius:8).stroke(EEIndustrialPalette.energized.opacity(0.2)))
-    }
-}
 
 @available(iOS 18.0, macOS 15.0, *)
 struct EEMCCBucket75: View {

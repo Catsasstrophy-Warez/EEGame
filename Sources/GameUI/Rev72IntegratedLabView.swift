@@ -2,11 +2,13 @@
 import SwiftUI
 import ScenarioEngine
 import RealityScene
+import MetalTelemetry
 
 @available(iOS 18.0, macOS 15.0, *)
 public struct Rev72IntegratedLabView: View {
     @State private var runtime = EEIntegratedLabRuntime72()
     @State private var showRealityScene = false
+    @State private var scopeBuffer = TelemetryRingBuffer(capacity:160)
     @State private var simulation = EESimulationCoordinator75()
     @State private var tab = 0
     @State private var selectedIdentity = "TB1:12"
@@ -137,7 +139,15 @@ public struct Rev72IntegratedLabView: View {
                     }.foregroundStyle(.secondary)
                 }.accessibilityIdentifier("quickBench.dmm")
                 EEInstrumentPanel75("Oscilloscope",subtitle:"SCOPE-1  •  CH1 LIVE SIGNAL") {
-                    EEWaveform75(phase:simulation.snapshot.time*4)
+                    TimelineView(.animation(minimumInterval:1.0/30.0)) { timeline in
+                        TelemetryWaveformView(samples:scopeBuffer.values)
+                            .frame(height:90)
+                            .background(.black.opacity(0.7),in:RoundedRectangle(cornerRadius:8))
+                            .onChange(of:timeline.date) { _,_ in
+                                let normalized = Float(min(max(simulation.snapshot.terminalVoltage/30.0,-1),1))
+                                scopeBuffer.append(normalized)
+                            }
+                    }.accessibilityIdentifier("quickBench.scope.telemetry")
                     HStack {
                         Text("CH1").foregroundStyle(EEIndustrialPalette.energized)
                         Spacer()

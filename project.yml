@@ -54,6 +54,16 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.electricengineer.training.RealityScene
         SUPPORTS_MACCATALYST: YES
 
+  MetalTelemetry:
+    type: framework
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources: [Sources/MetalTelemetry]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.electricengineer.training.MetalTelemetry
+        SUPPORTS_MACCATALYST: YES
+
   GameUI:
     type: framework
     platform: iOS
@@ -62,6 +72,7 @@ targets:
     dependencies:
       - target: ScenarioEngine
       - target: RealityScene
+      - target: MetalTelemetry
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.electricengineer.training.GameUI
@@ -83,6 +94,8 @@ targets:
       - target: ScenarioEngine
         embed: true
       - target: RealityScene
+        embed: true
+      - target: MetalTelemetry
         embed: true
       - target: GameUI
         embed: true

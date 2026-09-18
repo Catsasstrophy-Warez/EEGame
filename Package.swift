@@ -9,6 +9,7 @@ let package = Package(
         .library(name: "CircuitMNA", targets: ["CircuitMNA"]),
         .library(name: "ScenarioEngine", targets: ["ScenarioEngine"]),
         .library(name: "RealityScene", targets: ["RealityScene"]),
+        .library(name: "MetalTelemetry", targets: ["MetalTelemetry"]),
         .library(name: "GameUI", targets: ["GameUI"])
     ],
     targets: [
@@ -16,7 +17,8 @@ let package = Package(
         .target(name: "CircuitMNA", dependencies: ["ElectricalCore"]),
         .target(name: "ScenarioEngine", dependencies: ["ElectricalCore", "CircuitMNA"]),
         .target(name: "RealityScene"),
-        .target(name: "GameUI", dependencies: ["ScenarioEngine", "RealityScene"]),
+        .target(name: "MetalTelemetry"),
+        .target(name: "GameUI", dependencies: ["ScenarioEngine", "RealityScene", "MetalTelemetry"]),
         .testTarget(name: "ElectricalCoreTests", dependencies: ["ElectricalCore", "CircuitMNA", "ScenarioEngine"])
     ]
 )
