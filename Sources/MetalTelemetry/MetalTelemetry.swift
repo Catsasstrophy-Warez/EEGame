@@ -38,14 +38,26 @@ fragment float4 telemetry_fragment(constant float4 &color [[buffer(0)]]) {
 }
 """
 
-/// Minimal Metal render pipeline for a single scrolling telemetry trace.
-/// All GPU state lives here; the shader is compiled from an embedded MSL
-/// source string so no .metal build-phase wiring is required.
+/// One scrolling channel: normalized samples (-1...1, oldest first) plus the
+/// color it draws in.
+public struct TelemetryTrace: Sendable {
+    public var samples: [Float]
+    public var color: SIMD4<Float>
+
+    public init(samples: [Float], color: SIMD4<Float>) {
+        self.samples = samples
+        self.color = color
+    }
+}
+
+/// Minimal Metal render pipeline for one or more scrolling telemetry
+/// channels drawn into the same view (e.g. CH1 voltage, CH2 current). All
+/// GPU state lives here; the shader is compiled from an embedded MSL source
+/// string so no .metal build-phase wiring is required.
 @MainActor
 public final class TelemetryWaveformRenderer: NSObject, MTKViewDelegate {
     public let device: MTLDevice
-    public var samples: [Float] = []
-    public var lineColor: SIMD4<Float> = [0.2, 0.85, 1.0, 1.0]
+    public var traces: [TelemetryTrace] = []
 
     private let commandQueue: MTLCommandQueue
     private let pipelineState: MTLRenderPipelineState
@@ -75,36 +87,35 @@ public final class TelemetryWaveformRenderer: NSObject, MTKViewDelegate {
 
     public func draw(in view: MTKView) {
         guard
-            samples.count > 1,
             let drawable = view.currentDrawable,
             let renderPassDescriptor = view.currentRenderPassDescriptor,
             let commandBuffer = commandQueue.makeCommandBuffer(),
             let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor)
         else { return }
 
-        let count = samples.count
-        var vertices = [Float](repeating: 0, count: count * 2)
-        for i in 0..<count {
-            vertices[i * 2] = Float(i) / Float(count - 1) * 2 - 1
-            vertices[i * 2 + 1] = samples[i]
-        }
-
-        guard let vertexBuffer = device.makeBuffer(
-            bytes: vertices,
-            length: vertices.count * MemoryLayout<Float>.stride,
-            options: [.storageModeShared]
-        ) else {
-            encoder.endEncoding()
-            return
-        }
-
-        var color = lineColor
         encoder.setRenderPipelineState(pipelineState)
-        encoder.setVertexBuffer(vertexBuffer, offset: 0, index: 0)
-        encoder.setFragmentBytes(&color, length: MemoryLayout<SIMD4<Float>>.stride, index: 0)
-        encoder.drawPrimitives(type: .lineStrip, vertexStart: 0, vertexCount: count)
-        encoder.endEncoding()
 
+        for trace in traces where trace.samples.count > 1 {
+            let count = trace.samples.count
+            var vertices = [Float](repeating: 0, count: count * 2)
+            for i in 0..<count {
+                vertices[i * 2] = Float(i) / Float(count - 1) * 2 - 1
+                vertices[i * 2 + 1] = trace.samples[i]
+            }
+
+            guard let vertexBuffer = device.makeBuffer(
+                bytes: vertices,
+                length: vertices.count * MemoryLayout<Float>.stride,
+                options: [.storageModeShared]
+            ) else { continue }
+
+            var color = trace.color
+            encoder.setVertexBuffer(vertexBuffer, offset: 0, index: 0)
+            encoder.setFragmentBytes(&color, length: MemoryLayout<SIMD4<Float>>.stride, index: 0)
+            encoder.drawPrimitives(type: .lineStrip, vertexStart: 0, vertexCount: count)
+        }
+
+        encoder.endEncoding()
         commandBuffer.present(drawable)
         commandBuffer.commit()
     }
@@ -113,16 +124,19 @@ public final class TelemetryWaveformRenderer: NSObject, MTKViewDelegate {
 #if canImport(UIKit)
 import UIKit
 
-/// SwiftUI host for a live Metal-rendered telemetry trace (voltage/current
-/// scrolling graph). Normalized samples are expected in -1...1.
+/// SwiftUI host for one or more live Metal-rendered telemetry traces
+/// (voltage/current scrolling graph). Normalized samples are expected in
+/// -1...1.
 @available(iOS 18.0, *)
 public struct TelemetryWaveformView: UIViewRepresentable {
-    public var samples: [Float]
-    public var lineColor: SIMD4<Float>
+    public var traces: [TelemetryTrace]
+
+    public init(traces: [TelemetryTrace]) {
+        self.traces = traces
+    }
 
     public init(samples: [Float], lineColor: SIMD4<Float> = [0.2, 0.85, 1.0, 1.0]) {
-        self.samples = samples
-        self.lineColor = lineColor
+        self.traces = [TelemetryTrace(samples: samples, color: lineColor)]
     }
 
     public final class Coordinator {
@@ -152,8 +166,7 @@ public struct TelemetryWaveformView: UIViewRepresentable {
     }
 
     public func updateUIView(_ uiView: MTKView, context: Context) {
-        context.coordinator.renderer?.samples = samples
-        context.coordinator.renderer?.lineColor = lineColor
+        context.coordinator.renderer?.traces = traces
     }
 }
 #endif

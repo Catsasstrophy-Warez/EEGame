@@ -8,7 +8,8 @@ import MetalTelemetry
 public struct Rev72IntegratedLabView: View {
     @State private var runtime = EEIntegratedLabRuntime72()
     @State private var showRealityScene = false
-    @State private var scopeBuffer = TelemetryRingBuffer(capacity:160)
+    @State private var scopeVoltageBuffer = TelemetryRingBuffer(capacity:160)
+    @State private var scopeCurrentBuffer = TelemetryRingBuffer(capacity:160)
     @State private var simulation = EESimulationCoordinator75()
     @State private var tab = 0
     @State private var selectedIdentity = "TB1:12"
@@ -40,7 +41,9 @@ public struct Rev72IntegratedLabView: View {
         .preferredColorScheme(.dark)
         .tint(EEIndustrialPalette.energized)
         .sheet(isPresented:$showRealityScene) {
-            RealitySceneView(energized:simulation.snapshot.currentA>0,voltage:simulation.snapshot.terminalVoltage)
+            TimelineView(.animation(minimumInterval:1.0/15.0)) { _ in
+                RealitySceneView(energized:simulation.snapshot.currentA>0,voltage:simulation.snapshot.terminalVoltage)
+            }
         }
     }
 
@@ -140,15 +143,18 @@ public struct Rev72IntegratedLabView: View {
                         Text("COM → 0V").font(.caption.monospaced())
                     }.foregroundStyle(.secondary)
                 }.accessibilityIdentifier("quickBench.dmm")
-                EEInstrumentPanel75("Oscilloscope",subtitle:"SCOPE-1  •  CH1 LIVE SIGNAL") {
+                EEInstrumentPanel75("Oscilloscope",subtitle:"SCOPE-1  •  CH1 VOLTAGE  •  CH2 CURRENT") {
                     TimelineView(.animation(minimumInterval:1.0/30.0)) { timeline in
-                        TelemetryWaveformView(samples:scopeBuffer.values)
-                            .frame(height:90)
-                            .background(.black.opacity(0.7),in:RoundedRectangle(cornerRadius:8))
-                            .onChange(of:timeline.date) { _,_ in
-                                let normalized = Float(min(max(simulation.snapshot.terminalVoltage/30.0,-1),1))
-                                scopeBuffer.append(normalized)
-                            }
+                        TelemetryWaveformView(traces:[
+                            .init(samples:scopeVoltageBuffer.values,color:[0.2,0.85,1.0,1.0]),
+                            .init(samples:scopeCurrentBuffer.values,color:[1.0,0.65,0.15,1.0])
+                        ])
+                        .frame(height:90)
+                        .background(.black.opacity(0.7),in:RoundedRectangle(cornerRadius:8))
+                        .onChange(of:timeline.date) { _,_ in
+                            scopeVoltageBuffer.append(Float(min(max(simulation.snapshot.terminalVoltage/30.0,-1),1)))
+                            scopeCurrentBuffer.append(Float(min(max(simulation.snapshot.currentA/1.0,-1),1)))
+                        }
                     }.accessibilityIdentifier("quickBench.scope.telemetry")
                     HStack {
                         Text("CH1").foregroundStyle(EEIndustrialPalette.energized)
