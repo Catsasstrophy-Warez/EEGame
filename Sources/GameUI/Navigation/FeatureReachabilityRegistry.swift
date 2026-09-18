@@ -35,7 +35,8 @@ public enum EEFeatureReachabilityRegistry75 {
         .init(id: "facility-power-88", title: "Rev88 Facility Power", workspace: .field, maturity: .integrated, accessibilityID: "field.rev88FacilityPower"),
         .init(id: "starter-bucket-88", title: "Rev88 Starter Bucket", workspace: .field, maturity: .integrated, accessibilityID: "rev88.starterBucket"),
         .init(id: "instrument-cluster-88", title: "Rev88 Unified Instruments", workspace: .field, maturity: .integrated, accessibilityID: "rev88.instrumentCluster"),
-        .init(id: "causal-ribbon-88", title: "Rev88 Causal Ribbon", workspace: .field, maturity: .integrated, accessibilityID: "rev88.causalRibbon")
+        .init(id: "causal-ribbon-88", title: "Rev88 Causal Ribbon", workspace: .field, maturity: .integrated, accessibilityID: "rev88.causalRibbon"),
+        .init(id: "reality-scene", title: "RealityKit Scene (Scaffold)", workspace: .quickBench, maturity: .implemented, accessibilityID: "commandHeader.realityScene")
     ]
 }
 #endif

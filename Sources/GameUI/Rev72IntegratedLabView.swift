@@ -1,10 +1,12 @@
 #if canImport(SwiftUI)
 import SwiftUI
 import ScenarioEngine
+import RealityScene
 
 @available(iOS 18.0, macOS 15.0, *)
 public struct Rev72IntegratedLabView: View {
     @State private var runtime = EEIntegratedLabRuntime72()
+    @State private var showRealityScene = false
     @State private var simulation = EESimulationCoordinator75()
     @State private var tab = 0
     @State private var selectedIdentity = "TB1:12"
@@ -35,6 +37,7 @@ public struct Rev72IntegratedLabView: View {
         }
         .preferredColorScheme(.dark)
         .tint(EEIndustrialPalette.energized)
+        .sheet(isPresented:$showRealityScene) { RealitySceneView() }
     }
 
     private var commandHeader: some View {
@@ -49,6 +52,10 @@ public struct Rev72IntegratedLabView: View {
                     .font(.system(size:8,weight:.semibold,design:.monospaced)).foregroundStyle(.secondary)
             }
             Spacer()
+            Button { showRealityScene = true } label: {
+                Image(systemName:"cube.transparent")
+            }.buttonStyle(.plain).foregroundStyle(EEIndustrialPalette.energized)
+                .accessibilityIdentifier("commandHeader.realityScene")
             VStack(alignment:.trailing,spacing:3) {
                 EEStatusLamp75(label:"SIM",active:simulation.isRunning,tint:EEIndustrialPalette.healthy)
                 Text(String(format:"T+%.3f",simulation.snapshot.time))

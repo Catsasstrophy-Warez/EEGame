@@ -44,6 +44,16 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.electricengineer.training.ScenarioEngine
         SUPPORTS_MACCATALYST: YES
 
+  RealityScene:
+    type: framework
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources: [Sources/RealityScene]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.electricengineer.training.RealityScene
+        SUPPORTS_MACCATALYST: YES
+
   GameUI:
     type: framework
     platform: iOS
@@ -51,6 +61,7 @@ targets:
     sources: [Sources/GameUI]
     dependencies:
       - target: ScenarioEngine
+      - target: RealityScene
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.electricengineer.training.GameUI
@@ -70,6 +81,8 @@ targets:
       - target: CircuitMNA
         embed: true
       - target: ScenarioEngine
+        embed: true
+      - target: RealityScene
         embed: true
       - target: GameUI
         embed: true
