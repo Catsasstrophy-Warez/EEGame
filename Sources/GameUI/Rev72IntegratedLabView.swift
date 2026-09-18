@@ -13,11 +13,18 @@ public struct Rev72IntegratedLabView: View {
     private let scopeMinVoltageRange = 1.0
     private let scopeMinCurrentRange = 0.05
     private let scopeGridHorizontalDivisions = 8
-    /// Raw (unnormalized) volt/amp history — normalization for the Metal
-    /// view happens per-frame in `scopeVoltageRange`/`scopeCurrentRange` so
-    /// the axis auto-ranges to whatever the signal is actually doing.
+    /// Per-tick multiplicative release for the auto-range peak-hold below —
+    /// not a buffer-window artifact: the range decays every tick a quiet
+    /// sample arrives, independent of how long the old spike is still
+    /// sitting in the ring buffer. ~0.94^30 ≈ 0.16 per second.
+    private let scopeRangeReleasePerTick = 0.94
+    /// Raw (unnormalized) volt/amp history, used only for the trace shape —
+    /// the axis range that normalizes it lives in `scopeVoltageRange`/
+    /// `scopeCurrentRange` below, a decaying peak-hold, not a buffer scan.
     @State private var scopeVoltageBuffer = TelemetryRingBuffer(capacity:160)
     @State private var scopeCurrentBuffer = TelemetryRingBuffer(capacity:160)
+    @State private var scopeVoltageRange = 1.0
+    @State private var scopeCurrentRange = 0.05
     @State private var simulation = EESimulationCoordinator75()
     @State private var tab = 0
     @State private var selectedIdentity = "TB1:12"
@@ -80,22 +87,22 @@ public struct Rev72IntegratedLabView: View {
         .background(.black.opacity(0.38))
     }
 
-    /// Auto-ranged, symmetric-about-zero full-scale value for a channel:
-    /// the largest magnitude currently in the buffer, padded 10%, floored at
-    /// `minimumRange` so a flat/near-zero signal doesn't collapse to a
-    /// razor-thin trace.
-    private func autoRange(_ values: [Float], minimumRange: Double) -> Double {
-        let peak = values.reduce(0) { max($0, abs($1)) }
-        return max(Double(peak) * 1.1, minimumRange)
+    /// Peak-hold-with-release envelope (classic VU meter behavior): attacks
+    /// instantly to a new peak, otherwise decays multiplicatively toward
+    /// `minimumRange` every tick. Unlike scanning the whole ring buffer for
+    /// its max, this actually forgets a one-off spike within a couple of
+    /// seconds instead of holding the range until the spike physically
+    /// scrolls out of the buffer.
+    private func decayedRange(current: Double, newestSample: Float, minimumRange: Double) -> Double {
+        let instantaneous = max(Double(abs(newestSample)) * 1.1, minimumRange)
+        if instantaneous > current { return instantaneous }
+        return max(minimumRange, current * scopeRangeReleasePerTick)
     }
 
     private func normalized(_ values: [Float], by range: Double) -> [Float] {
         guard range > 0 else { return values }
         return values.map { Float(min(max(Double($0) / range, -1), 1)) }
     }
-
-    private var scopeVoltageRange: Double { autoRange(scopeVoltageBuffer.values,minimumRange:scopeMinVoltageRange) }
-    private var scopeCurrentRange: Double { autoRange(scopeCurrentBuffer.values,minimumRange:scopeMinCurrentRange) }
 
     private var scopeTimebaseLabel: String {
         let windowSeconds = Double(scopeSampleCount) / scopeSampleRateHz
@@ -205,8 +212,12 @@ public struct Rev72IntegratedLabView: View {
                                 .init(samples:normalized(scopeCurrentBuffer.values,by:scopeCurrentRange),color:[1.0,0.65,0.15,1.0])
                             ])
                             .onChange(of:timeline.date) { _,_ in
-                                scopeVoltageBuffer.append(Float(simulation.snapshot.terminalVoltage))
-                                scopeCurrentBuffer.append(Float(simulation.snapshot.currentA))
+                                let voltageSample = Float(simulation.snapshot.terminalVoltage)
+                                let currentSample = Float(simulation.snapshot.currentA)
+                                scopeVoltageBuffer.append(voltageSample)
+                                scopeCurrentBuffer.append(currentSample)
+                                scopeVoltageRange = decayedRange(current:scopeVoltageRange,newestSample:voltageSample,minimumRange:scopeMinVoltageRange)
+                                scopeCurrentRange = decayedRange(current:scopeCurrentRange,newestSample:currentSample,minimumRange:scopeMinCurrentRange)
                             }
                             scopeAxisOverlay
                         }

@@ -1,0 +1,30 @@
+excluded:
+  - .build
+  - Scripts
+
+# The existing engine/UI code is written in a very dense, single-line style
+# (some files exceed 1,000 columns on one line). Style rules that would
+# flag that on every line are disabled here rather than silenced per-file,
+# so lint stays useful for real issues instead of drowning in noise.
+disabled_rules:
+  - line_length
+  - file_length
+  - type_body_length
+  - function_body_length
+  - function_parameter_count
+  - cyclomatic_complexity
+  - large_tuple
+  - nesting
+  - todo
+
+opt_in_rules:
+  # CLAUDE.md: omit explicit `return` in single-expression functions.
+  - implicit_return
+  - empty_count
+  - force_unwrapping
+
+identifier_name:
+  min_length: 1
+  excluded:
+    - id
+    - dt
