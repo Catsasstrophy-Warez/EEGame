@@ -1,0 +1,23 @@
+import Foundation
+import ElectricalCore
+import CircuitMNA
+
+public enum CommissioningMode:String,Sendable,Codable { case internalSimulation, softwareInLoop, hardwareInLoop }
+public enum SignalDirection:String,Sendable,Codable { case controllerToPlant, plantToController }
+public struct CommissioningSignal:Sendable,Codable,Equatable { public var tag:String;public var direction:SignalDirection;public var value:Double;public var timestamp:Double; public init(tag:String,direction:SignalDirection,value:Double=0,timestamp:Double=0){self.tag=tag;self.direction=direction;self.value=value;self.timestamp=timestamp} }
+public struct VirtualCommissioningBus:Sendable { public var mode:CommissioningMode = .internalSimulation; public var signals:[String:CommissioningSignal]=[:]; public init(){}; public mutating func publish(_ s:CommissioningSignal){signals[s.tag]=s}; public func value(_ tag:String,maxAge:Double,now:Double)->Double?{guard let s=signals[tag],now-s.timestamp<=maxAge else{return nil};return s.value} }
+
+public enum BuildStage:Int,CaseIterable,Sendable,Codable { case enclosure, backplate, dinRail, wireDuct, devices, terminalBlocks, grounding, fieldCable, pointToPointWiring, labels, inspection, electricalTest, energization }
+public struct PanelFabricationRecord:Sendable,Codable { public var completed:Set<BuildStage>=[]; public init(){}; public mutating func complete(_ stage:BuildStage)->Bool { guard BuildStage.allCases.filter({$0.rawValue<stage.rawValue}).allSatisfy(completed.contains) else{return false};completed.insert(stage);return true }; public var readyToEnergize:Bool{BuildStage.allCases.filter{$0 != .energization}.allSatisfy(completed.contains)} }
+
+public enum PanelFinding:String,Sendable,Codable,Equatable { case missingPE, shieldMixedWithPower, insufficientControlPower, overTemperature, duplicateTag, inaccessibleTerminal }
+public struct PanelDesignAudit:Sendable,Equatable { public var findings:[PanelFinding]; public var score:Int { max(0,100-findings.count*12) } }
+public enum PanelDesignRules { public static func audit(hasPE:Bool,analogAndPowerShareDuct:Bool,controlPowerUtilization:Double,temperatureC:Double,tags:[String],terminalClearanceMM:Double)->PanelDesignAudit { var f:[PanelFinding]=[];if !hasPE{f.append(.missingPE)};if analogAndPowerShareDuct{f.append(.shieldMixedWithPower)};if controlPowerUtilization>1{f.append(.insufficientControlPower)};if temperatureC>60{f.append(.overTemperature)};if Set(tags).count != tags.count{f.append(.duplicateTag)};if terminalClearanceMM<25{f.append(.inaccessibleTerminal)};return .init(findings:f) } }
+
+public struct ScenarioSeed:Sendable,Codable,Equatable { public var topologySeed:UInt64;public var faultSeed:UInt64;public var environmentSeed:UInt64;public init(topologySeed:UInt64,faultSeed:UInt64,environmentSeed:UInt64){self.topologySeed=topologySeed;self.faultSeed=faultSeed;self.environmentSeed=environmentSeed} }
+public struct DeterministicRNG:Sendable { private var state:UInt64;public init(seed:UInt64){state=seed == 0 ? 0x9E3779B97F4A7C15:seed};public mutating func next()->UInt64{state &+= 0x9E3779B97F4A7C15;var z=state;z=(z^(z>>30))&*0xBF58476D1CE4E5B9;z=(z^(z>>27))&*0x94D049BB133111EB;return z^(z>>31)};public mutating func unit()->Double{Double(next()>>11)/Double(1<<53)} }
+public enum FaultFamily:String,Sendable,Codable { case looseTermination, phaseLoss, insulationLeakage, blockedProcess, sensorDrift, staleNetwork, weldedContact, openCircuit }
+public struct GeneratedFault:Sendable,Codable,Equatable { public var family:FaultFamily;public var severity:Double }
+public enum ScenarioGenerator { public static func generate(seed:ScenarioSeed,count:Int)->[GeneratedFault]{var r=DeterministicRNG(seed:seed.faultSeed);let all:[FaultFamily]=[.looseTermination,.phaseLoss,.insulationLeakage,.blockedProcess,.sensorDrift,.staleNetwork,.weldedContact,.openCircuit];return (0..<max(0,count)).map{_ in .init(family:all[Int(r.next()%UInt64(all.count))],severity:0.2+0.8*r.unit())}} }
+
+public struct Rev12PlantRuntime:Sendable { public var scheduler=MultiRateScheduler();public var skid=ProcessSkid();public var bus=VirtualCommissioningBus();public var time=0.0; public init(){}; public mutating func step(dt:Double,pumpCommand:Double,valveCommand:Double){time += dt;for d in scheduler.advance(dt:dt){switch d{case .process:skid.step(pumpCommand:pumpCommand,valveCommand:valveCommand,dt:0.05);bus.publish(.init(tag:"FT-101",direction:.plantToController,value:skid.flowTransmitter.outputMilliamps(),timestamp:time));bus.publish(.init(tag:"LT-101",direction:.plantToController,value:skid.levelTransmitter.outputMilliamps(),timestamp:time));default:break}}} }

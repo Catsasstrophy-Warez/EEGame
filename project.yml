@@ -1,0 +1,100 @@
+name: ElectricEngineerGame
+options:
+  bundleIdPrefix: com.electricengineer.training
+settings:
+  base:
+    SWIFT_VERSION: 6.0
+    IPHONEOS_DEPLOYMENT_TARGET: 18.0
+    MACOSX_DEPLOYMENT_TARGET: 15.0
+    ENABLE_STRICT_CONCURRENCY: complete
+
+targets:
+  ElectricalCore:
+    type: framework
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources: [Sources/ElectricalCore]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.electricengineer.training.ElectricalCore
+        SUPPORTS_MACCATALYST: YES
+
+  CircuitMNA:
+    type: framework
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources: [Sources/CircuitMNA]
+    dependencies:
+      - target: ElectricalCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.electricengineer.training.CircuitMNA
+        SUPPORTS_MACCATALYST: YES
+
+  ScenarioEngine:
+    type: framework
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources: [Sources/ScenarioEngine]
+    dependencies:
+      - target: ElectricalCore
+      - target: CircuitMNA
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.electricengineer.training.ScenarioEngine
+        SUPPORTS_MACCATALYST: YES
+
+  GameUI:
+    type: framework
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources: [Sources/GameUI]
+    dependencies:
+      - target: ScenarioEngine
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.electricengineer.training.GameUI
+        SUPPORTS_MACCATALYST: YES
+
+  ElectricEngineerGame:
+    type: application
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources: [Sources/ElectricEngineerApp]
+    dependencies:
+      # Explicit direct app dependencies are intentional.
+      # Dynamic framework dependencies must all be copied into the final .app;
+      # relying on transitive target dependencies can leave only GameUI embedded.
+      - target: ElectricalCore
+        embed: true
+      - target: CircuitMNA
+        embed: true
+      - target: ScenarioEngine
+        embed: true
+      - target: GameUI
+        embed: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.electricengineer.training.game
+        PRODUCT_NAME: Electric Engineer
+        GENERATE_INFOPLIST_FILE: YES
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SUPPORTS_MACCATALYST: YES
+        CODE_SIGN_STYLE: Automatic
+    scheme:
+      testTargets:
+        - ElectricalCoreTests
+
+  ElectricalCoreTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources: [Tests/ElectricalCoreTests]
+    dependencies:
+      - target: ElectricalCore
+      - target: CircuitMNA
+      - target: ScenarioEngine
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        SUPPORTS_MACCATALYST: YES

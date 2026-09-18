@@ -1,0 +1,2 @@
+# Safety and Authenticity
+This project is an educational simulation. Game thresholds, protection settings, mine ventilation values, anti-surge lines and procedural logic are not field instructions or regulatory criteria. Actual work must follow current site procedures, OEM documentation, applicable codes/regulations and qualified-person requirements. Public real-world facilities inform scale and system architecture; fictional facilities do not claim proprietary replication.

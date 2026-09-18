@@ -1,0 +1,35 @@
+import Foundation
+import ElectricalCore
+import CircuitMNA
+
+// Rev11: career + panel manufacturing + deeper automation/process diagnostics.
+public enum WorkDomain:String,Sendable,Codable,CaseIterable { case residential, commercial, industrial, instrumentation, automation }
+public struct WorkOrder:Identifiable,Sendable,Codable,Equatable {
+ public var id:String; public var title:String; public var domain:WorkDomain; public var safetyRequired:Bool; public var objectives:[String]; public var reward:Int
+ public init(id:String,title:String,domain:WorkDomain,safetyRequired:Bool=true,objectives:[String],reward:Int){self.id=id;self.title=title;self.domain=domain;self.safetyRequired=safetyRequired;self.objectives=objectives;self.reward=reward}
+}
+public struct CareerState:Sendable,Codable,Equatable { public var credits=0; public var reputation=0; public var completed:Set<String>=[]; public init(){}; public mutating func complete(_ order:WorkOrder,rootCauseVerified:Bool){guard rootCauseVerified && !completed.contains(order.id) else{return};completed.insert(order.id);credits += order.reward;reputation += max(1,order.reward/100)} }
+
+public enum IsolationSourceKind:String,Sendable,Codable { case utility, controlTransformer, dcSupply, ups, storedMechanical, pneumatic }
+public struct IsolationSource:Identifiable,Sendable,Codable,Equatable { public var id:String; public var kind:IsolationSourceKind; public var isolated:Bool; public var verifiedZeroEnergy:Bool; public init(id:String,kind:IsolationSourceKind,isolated:Bool=false,verifiedZeroEnergy:Bool=false){self.id=id;self.kind=kind;self.isolated=isolated;self.verifiedZeroEnergy=verifiedZeroEnergy} }
+public struct EnergyIsolationPlan:Sendable,Codable,Equatable { public var sources:[IsolationSource]; public init(_ sources:[IsolationSource]){self.sources=sources}; public var safeToWork:Bool{sources.allSatisfy{$0.isolated && $0.verifiedZeroEnergy}} }
+
+public struct BillOfMaterialItem:Identifiable,Sendable,Codable,Equatable { public var id:String; public var description:String; public var quantity:Int; public var unitCost:Double; public init(id:String,description:String,quantity:Int,unitCost:Double){self.id=id;self.description=description;self.quantity=quantity;self.unitCost=unitCost}; public var extendedCost:Double{Double(quantity)*unitCost} }
+public struct PanelBillOfMaterials:Sendable,Codable,Equatable { public var items:[BillOfMaterialItem]; public init(items:[BillOfMaterialItem]=[]){self.items=items}; public var totalCost:Double{items.reduce(0){$0+$1.extendedCost}} }
+
+public struct DINRail:Identifiable,Sendable,Codable,Equatable { public var id:String; public var start:PanelPoint; public var lengthMM:Double; public var occupied:[ClosedRange<Double>]=[]; public init(id:String,start:PanelPoint,lengthMM:Double){self.id=id;self.start=start;self.lengthMM=lengthMM}; public mutating func mount(widthMM:Double,at offset:Double)->Bool{guard offset>=0,offset+widthMM<=lengthMM else{return false};let r=offset...(offset+widthMM);guard !occupied.contains(where:{$0.overlaps(r)}) else{return false};occupied.append(r);return true} }
+public enum FieldCableKind:String,Sendable,Codable { case power, control, instrumentation, ethernet }
+public struct CableCore:Identifiable,Sendable,Codable,Equatable { public var id:String; public var label:String; public var landedTerminal:String?; public init(id:String,label:String,landedTerminal:String?=nil){self.id=id;self.label=label;self.landedTerminal=landedTerminal} }
+public struct FieldCable:Identifiable,Sendable,Codable,Equatable { public var id:String; public var kind:FieldCableKind; public var cores:[CableCore]; public var shieldGroundedAtPanel=false; public var shieldGroundedAtField=false; public init(id:String,kind:FieldCableKind,cores:[CableCore]){self.id=id;self.kind=kind;self.cores=cores}; public var doubleEndedShield:Bool{shieldGroundedAtPanel && shieldGroundedAtField} }
+
+public enum IOElectricalFault:String,Sendable,Codable { case none, openWire, shortToCommon, shortToSupply, leakage, forced }
+public struct IOChannelTruth:Identifiable,Sendable,Codable,Equatable { public var id:String; public var fieldValue:Double; public var moduleValue:Double; public var fault:IOElectricalFault; public var updateAge:Double; public init(id:String,fieldValue:Double,moduleValue:Double,fault:IOElectricalFault = .none,updateAge:Double=0){self.id=id;self.fieldValue=fieldValue;self.moduleValue=moduleValue;self.fault=fault;self.updateAge=updateAge}; public var discrepancy:Double{abs(fieldValue-moduleValue)} }
+
+public struct SafetyFeedbackRuntime:Sendable,Codable,Equatable { public var commandSafe=false; public var contactorFeedback=false; public var discrepancySeconds=0.0; public var discrepancyLimit=0.5; public var faultLatched=false; public init(){}; public mutating func step(dt:Double){let expected=commandSafe;if contactorFeedback != expected{discrepancySeconds += dt;if discrepancySeconds>=discrepancyLimit{faultLatched=true}}else{discrepancySeconds=0}}; public mutating func reset(){if contactorFeedback == commandSafe{faultLatched=false;discrepancySeconds=0}} }
+
+public struct PumpProcess:Sendable,Codable,Equatable { public var speedPercent=0.0; public var suctionPressurePSI=20.0; public var dischargePressurePSI=20.0; public var flowGPM=0.0; public var blockedDischarge=false; public init(){}; public mutating func step(commandPercent:Double,dt:Double){let target=min(max(commandPercent,0),100);speedPercent += (target-speedPercent)*min(dt*2,1);flowGPM = blockedDischarge ? 0 : speedPercent*1.2;dischargePressurePSI=suctionPressurePSI + speedPercent*(blockedDischarge ? 1.0:0.35)} }
+public struct ProcessSkid:Sendable { public var tank=ProcessTank(); public var valve=ControlValve(); public var pump=PumpProcess(); public var levelTransmitter=SmartTransmitter420(); public var flowTransmitter=SmartTransmitter420(); public init(){flowTransmitter.urv=150}; public mutating func step(pumpCommand:Double,valveCommand:Double,dt:Double){pump.step(commandPercent:pumpCommand,dt:dt);valve.commandPercent=valveCommand;valve.step(dt:dt);tank.inletLPS=pump.flowGPM*0.0630902;tank.outletLPS=valve.actualPercent/100*6;tank.step(dt:dt);levelTransmitter.processValue=tank.levelPercent;flowTransmitter.processValue=pump.flowGPM} }
+
+public struct DiagnosticTrace:Sendable,Codable,Equatable { public var physical:Double; public var instrument:Double; public var io:Double; public var plc:Double; public var hmi:Double; public init(physical:Double,instrument:Double,io:Double,plc:Double,hmi:Double){self.physical=physical;self.instrument=instrument;self.io=io;self.plc=plc;self.hmi=hmi}; public var firstMismatch:String?{let v=[("instrument",instrument),("io",io),("plc",plc),("hmi",hmi)];var previous=physical;for (name,x) in v{if abs(x-previous)>0.001{return name};previous=x};return nil} }
+
+public struct Rev11PlantWorld:Sendable { public var rev10=Rev10EngineeringPlant(); public var skid=ProcessSkid(); public var safetyFeedback=SafetyFeedbackRuntime(); public var career=CareerState(); public init(){} }
