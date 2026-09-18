@@ -39,7 +39,9 @@ public struct Rev72IntegratedLabView: View {
         }
         .preferredColorScheme(.dark)
         .tint(EEIndustrialPalette.energized)
-        .sheet(isPresented:$showRealityScene) { RealitySceneView() }
+        .sheet(isPresented:$showRealityScene) {
+            RealitySceneView(energized:simulation.snapshot.currentA>0,voltage:simulation.snapshot.terminalVoltage)
+        }
     }
 
     private var commandHeader: some View {

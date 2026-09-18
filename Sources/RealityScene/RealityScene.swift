@@ -17,19 +17,42 @@ public enum RealitySceneContent {
         entity.name = "PlaceholderPanel"
         return entity
     }
+
+    /// Recolors the placeholder to reflect live circuit state. De-energized
+    /// panels stay a neutral blue; energized ones shift toward amber/red as
+    /// voltage climbs toward `referenceVoltage`.
+    public static func applyElectricalState(to entity: ModelEntity, energized: Bool, voltage: Double, referenceVoltage: Double = 30) {
+        var material = SimpleMaterial()
+        let intensity = Float(min(max(voltage / max(referenceVoltage, 1e-9), 0), 1))
+        material.color = energized
+            ? .init(tint: .init(red: 0.95, green: CGFloat(0.65 - 0.45 * Double(intensity)), blue: 0.12, alpha: 1))
+            : .init(tint: .init(red: 0.15, green: 0.55, blue: 0.85, alpha: 1))
+        material.roughness = .float(0.4)
+        material.metallic = .float(0.2)
+        entity.model?.materials = [material]
+    }
 }
 
-/// Minimal RealityKit host view establishing the architecture for future
-/// telemetry-driven 3D scenes. Presents a single procedural placeholder
-/// entity; no real content yet.
+/// RealityKit host view for the Quick Bench panel, driven live by the MNA
+/// solver's ElectricalSnapshot (via `energized`/`voltage`, passed in by the
+/// caller — this target has no ScenarioEngine dependency of its own).
 @available(iOS 18.0, macOS 15.0, *)
 @MainActor
 public struct RealitySceneView: View {
-    public init() {}
+    public var energized: Bool
+    public var voltage: Double
+    public var referenceVoltage: Double
+
+    public init(energized: Bool = false, voltage: Double = 0, referenceVoltage: Double = 30) {
+        self.energized = energized
+        self.voltage = voltage
+        self.referenceVoltage = referenceVoltage
+    }
 
     public var body: some View {
         RealityView { content in
             let panel = RealitySceneContent.buildPlaceholderPanel()
+            RealitySceneContent.applyElectricalState(to: panel, energized: energized, voltage: voltage, referenceVoltage: referenceVoltage)
             content.add(panel)
 
             var pointLight = PointLightComponent()
@@ -38,6 +61,9 @@ public struct RealitySceneView: View {
             light.components.set(pointLight)
             light.position = [0, 0.5, 0.5]
             content.add(light)
+        } update: { content, _ in
+            guard let panel = content.entities.first(where: { $0.name == "PlaceholderPanel" }) as? ModelEntity else { return }
+            RealitySceneContent.applyElectricalState(to: panel, energized: energized, voltage: voltage, referenceVoltage: referenceVoltage)
         }
         .accessibilityIdentifier("realityScene.root")
     }
