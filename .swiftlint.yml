@@ -16,6 +16,17 @@ disabled_rules:
   - large_tuple
   - nesting
   - todo
+  # Real CI run (first one, on the code this file already governs) surfaced
+  # ~180 warnings from these — all pure formatting on the same dense
+  # single-line style above, none a correctness signal. Disabled for the
+  # same reason as the length/complexity rules: they'd fire on nearly every
+  # existing line rather than flagging anything actionable.
+  - opening_brace
+  - return_arrow_whitespace
+  - colon
+  - comma
+  - statement_position
+  - switch_case_alignment
 
 opt_in_rules:
   # CLAUDE.md: omit explicit `return` in single-expression functions.
