@@ -604,7 +604,39 @@ import ScenarioEngine
  @Test func relayMechanicsCloses(){var r=EERelayMechanics53();r.coilVolts=24;for _ in 0..<20{r.step(dt:0.01)};#expect(r.closed)}
  @Test func breadboardRowsShareNode(){let b=EEBreadboard53();#expect(b.node(row:5,column:0)==b.node(row:5,column:4));#expect(b.node(row:5,column:0) != b.node(row:5,column:6))}
  @Test func embeddedRuntimeSteps(){var e=EEEmbeddedRuntime53();let p:[EEEmbeddedInstruction53]=[.set("OUT",1),.add("OUT",2)];e.step(p);e.step(p);#expect(e.registers["OUT"]==3);#expect(e.halted)}
- @Test func rev53RoundTrips() throws {var r=EERev53SimulationProduction();r.generator.frequencyHz=1234;r.relay.coilVolts=24;let d=try JSONEncoder().encode(r);#expect((try JSONDecoder().decode(EERev53SimulationProduction.self,from:d)).generator.frequencyHz==1234)}
+ // EERev53SimulationProduction's synthesized Codable is 7 .base-wrapped
+ // revisions deep, bottoming out in two large simulation subsystems.
+ // Encoding/decoding it at -Onone on Swift Testing's concurrency-executor
+ // thread (smaller default stack than the main thread) overflows the
+ // stack on real Apple platforms (confirmed via CI: a Bus error at
+ // ___chkstk_darwin, i.e. a genuine stack overflow, not a Foundation
+ // behavior difference — Linux's swift-corelibs-Foundation JSONEncoder
+ // apparently uses less stack per level and never hit this). Running the
+ // actual encode/decode on a thread with an explicit larger stack avoids
+ // it without touching the production Codable conformances.
+ @Test func rev53RoundTrips() throws {
+  var r=EERev53SimulationProduction();r.generator.frequencyHz=1234;r.relay.coilVolts=24
+  let toEncode=r
+  let semaphore=DispatchSemaphore(value:0)
+  // Safe despite the compiler's ordinary Sendable checking not being able to
+  // see it: semaphore.wait() below only returns after signal() below has
+  // run, so the write on the spawned thread and the read after wait() can
+  // never actually overlap.
+  nonisolated(unsafe) var decodedFrequency:Double?
+  nonisolated(unsafe) var thrown:Error?
+  let thread=Thread{
+   do{
+    let d=try JSONEncoder().encode(toEncode)
+    decodedFrequency=try JSONDecoder().decode(EERev53SimulationProduction.self,from:d).generator.frequencyHz
+   }catch{thrown=error}
+   semaphore.signal()
+  }
+  thread.stackSize=8*1024*1024
+  thread.start()
+  semaphore.wait()
+  if let thrown{throw thrown}
+  #expect(decodedFrequency==1234)
+ }
 }
 
 @Suite("Rev54 unified physical simulation") struct Rev54UnifiedPhysicalSimulationTests {
