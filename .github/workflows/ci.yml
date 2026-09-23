@@ -49,7 +49,9 @@ jobs:
   # can't see at all. This is the job that would have caught the
   # RealityView update-closure arity bug and the missing alpha-blending
   # bug, both of which shipped once already because no CI existed to catch
-  # them before a manual Xcode build did.
+  # them before a manual Xcode build did. Builds for Mac Catalyst rather
+  # than an iOS Simulator destination — see the comment on the build step
+  # for why.
   macos-xcode:
     runs-on: macos-15
     steps:
@@ -60,18 +62,27 @@ jobs:
         run: brew install xcodegen
       - name: Generate Xcode project
         run: xcodegen generate
-      - name: Build for iOS Simulator
+      # iOS Simulator destinations require a runtime download this runner
+      # image doesn't ship with by default (multi-GB, slow/flaky in CI).
+      # Mac Catalyst is always immediately available on any macOS runner
+      # with the matching Xcode installed, and — since
+      # SUPPORTS_MACCATALYST: YES is already set on every target in
+      # project.yml — type-checks exactly the same Swift/SwiftUI/
+      # RealityKit/MetalKit code as an iOS build would. If you need an
+      # actual iOS Simulator run (e.g. to catch a Catalyst-only behavior
+      # difference), add `xcodebuild -downloadPlatform iOS` first.
+      - name: Build for Mac Catalyst
         run: |
           xcodebuild -project ElectricEngineerGame.xcodeproj \
             -scheme ElectricEngineerGame \
-            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            -destination 'platform=macOS,variant=Mac Catalyst' \
             build \
             CODE_SIGNING_ALLOWED=NO
       - name: Run unit tests
         run: |
           xcodebuild -project ElectricEngineerGame.xcodeproj \
             -scheme ElectricEngineerGame \
-            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            -destination 'platform=macOS,variant=Mac Catalyst' \
             test \
             CODE_SIGNING_ALLOWED=NO
 
