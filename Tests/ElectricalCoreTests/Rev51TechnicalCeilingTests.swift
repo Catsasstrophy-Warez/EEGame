@@ -15,5 +15,5 @@ import Testing
  @Test func replayCarriesVibrationOrders(){let m=EERev51TechnicalCeiling();#expect(m.replay.gas[0].vibration.first?.orders[1] != nil);#expect(m.replay.coal[0].vibration.contains{$0.asset=="CENT-101"})}
  @Test func replayCarriesPLCTruthChannels(){let m=EERev51TechnicalCeiling();#expect(m.replay.gas[0].plc.tags["gas.discharge"] != nil);#expect(m.replay.coal[0].plc.tags["coal.mediumSG"] != nil)}
  @Test func nearestReplayIsWorldSpecific(){var m=EERev51TechnicalCeiling();m.advance(.naturalGas,seconds:2);let f=m.frame(world:.naturalGas,time:m.replay.gas.last!.time);#expect(f?.world == .naturalGas);#expect(m.frame(world:.coalMining,time:m.replay.gas.last!.time)?.world == .coalMining)}
- @Test func roundTrip() throws {let m=EERev51TechnicalCeiling();let d=try JSONEncoder().encode(m);let r=try JSONDecoder().decode(EERev51TechnicalCeiling.self,from:d);#expect(r.replay.gas.count==m.replay.gas.count);#expect(r.golden.audit.total==m.golden.audit.total)}
+ @Test func roundTrip() throws {let(gasMatch,auditMatch)=try runOnLargeStack{()->(Bool,Bool) in let m=EERev51TechnicalCeiling();let d=try JSONEncoder().encode(m);let r=try JSONDecoder().decode(EERev51TechnicalCeiling.self,from:d);return(r.replay.gas.count==m.replay.gas.count,r.golden.audit.total==m.golden.audit.total)};#expect(gasMatch);#expect(auditMatch)}
 }

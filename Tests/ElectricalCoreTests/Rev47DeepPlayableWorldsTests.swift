@@ -10,5 +10,5 @@ import Testing
  @Test func evidenceBoardUpdates(){var b=EEEvidenceBoardRev47();b.ingest(.init(id:"E1",time:0,world:.coalMining,identity:"CV-NR-OL",kind:.thermal,statement:"hot idler",value:"90 C",supports:["H-MECH"],contradicts:[]));#expect(b.ranked.first?.id == "H-MECH")}
  @Test func worldInstrumentCaptureCreatesEvidence(){var x=EERev47DeepPlayableWorlds();let e=x.capture(world:.naturalGas,channelID:"gas.discharge",instrument:.dmm);#expect(e != nil);#expect(x.board.cards.count == 1)}
  @Test func coalCaptureStaysCoal(){var x=EERev47DeepPlayableWorlds();_ = x.capture(world:.coalMining,channelID:"coal.beltAmps",instrument:.clampMeter);#expect(x.board.cards.last?.world == .coalMining)}
- @Test func rev47RoundTrip() throws {let x=EERev47DeepPlayableWorlds();let d=try JSONEncoder().encode(x);let y=try JSONDecoder().decode(EERev47DeepPlayableWorlds.self,from:d);#expect(x == y)}
+ @Test func rev47RoundTrip() throws {let matches=try runOnLargeStack{()->Bool in let x=EERev47DeepPlayableWorlds();let d=try JSONEncoder().encode(x);return try JSONDecoder().decode(EERev47DeepPlayableWorlds.self,from:d)==x};#expect(matches)}
 }

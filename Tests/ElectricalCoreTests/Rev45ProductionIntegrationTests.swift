@@ -11,5 +11,5 @@ import Testing
  @Test func timelineNearestRespectsWorld(){var t=EEUnifiedForensicTimeline();t.append(.init(time:1,world:.naturalGas,values:[:],events:[]));t.append(.init(time:1,world:.coalMining,values:[:],events:[]));#expect(t.nearest(1,world:.coalMining)?.world == .coalMining)}
  @Test func causalGeneratorIsDeterministic(){let g=EECausalScenarioGenerator();#expect(g.generate(world:.coalMining,seed:42) == g.generate(world:.coalMining,seed:42))}
  @Test func causalGeneratorDoesNotCrossIndustryFaultVocabulary(){let g=EECausalScenarioGenerator();let c=g.generate(world:.coalMining,seed:2);#expect(!c.rootFaults.contains(.valveDegradation));#expect(!c.rootFaults.contains(.coolingFouling))}
- @Test func rev45RoundTrip() throws {var x=EEProductionIntegrationRev45();x.tickGas(1);x.tickCoal(1);let d=try JSONEncoder().encode(x);#expect(try JSONDecoder().decode(EEProductionIntegrationRev45.self,from:d)==x)}
+ @Test func rev45RoundTrip() throws {let matches=try runOnLargeStack{()->Bool in var x=EEProductionIntegrationRev45();x.tickGas(1);x.tickCoal(1);let d=try JSONEncoder().encode(x);return try JSONDecoder().decode(EEProductionIntegrationRev45.self,from:d)==x};#expect(matches)}
 }

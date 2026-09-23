@@ -13,5 +13,5 @@ import Testing
  @Test func identitySearchCrossReferencesDrawings(){let x=EERev46PlayableIntegration();#expect(x.identities.related(reference:"LOADOUT_BATCH").contains{$0.id=="TLO-WB-1"})}
  @Test func instrumentEvidenceComesFromSnapshotTruth(){var x=EERev46PlayableIntegration();let s=x.timeline.gas.last!;let e=x.instruments.capture(snapshot:s,channelID:"gas.discharge");#expect(e?.provenance == "simulation-truth");#expect(e?.identity == "PIT-401");#expect(e?.value == s.channels.first{$0.id=="gas.discharge"}!.value)}
  @Test func timelineNearestNeverCrossesWorlds(){var x=EERev46PlayableIntegration();x.advanceGas(10);x.advanceCoal(20);#expect(x.timeline.nearest(time:20,world:.naturalGas)?.world == .naturalGas);#expect(x.timeline.nearest(time:10,world:.coalMining)?.world == .coalMining)}
- @Test func roundTrip(){var x=EERev46PlayableIntegration();x.advanceGas(3);x.advanceCoal(4);let d=try! JSONEncoder().encode(x);let y=try! JSONDecoder().decode(EERev46PlayableIntegration.self,from:d);#expect(y == x)}
+ @Test func roundTrip() throws {let matches=try runOnLargeStack{()->Bool in var x=EERev46PlayableIntegration();x.advanceGas(3);x.advanceCoal(4);let d=try JSONEncoder().encode(x);return try JSONDecoder().decode(EERev46PlayableIntegration.self,from:d)==x};#expect(matches)}
 }

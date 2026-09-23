@@ -13,5 +13,5 @@ import Testing
  @Test func plannerSuggestsDiscriminatingTests(){let p=EEDiagnosticPlanner48();let tests=p.nextTests(board:EEEvidenceBoardRev47(),world:.coalMining,asset:"CV-NR-OL");#expect(tests.contains{$0.id == "T-VDROP"});#expect(tests.contains{$0.id == "T-THERM"})}
  @Test func validPlacementCreatesEvidence(){var x=EERev48InteractiveForensics();let e=x.measure(world:.naturalGas,asset:"PIT-401",channelID:"gas.discharge",instrument:.dmm,points:["+","-"]);#expect(e != nil);#expect(x.base.board.cards.count == 1);#expect(e?.provenance == "simulation-truth")}
  @Test func invalidPlacementCannotCreateEvidence(){var x=EERev48InteractiveForensics();let e=x.measure(world:.naturalGas,asset:"PIT-401",channelID:"gas.discharge",instrument:.dmm,points:["+"]);#expect(e == nil);#expect(x.base.board.cards.isEmpty)}
- @Test func rev48RoundTrip() throws {let x=EERev48InteractiveForensics();let d=try JSONEncoder().encode(x);let y=try JSONDecoder().decode(EERev48InteractiveForensics.self,from:d);#expect(x == y)}
+ @Test func rev48RoundTrip() throws {let matches=try runOnLargeStack{()->Bool in let x=EERev48InteractiveForensics();let d=try JSONEncoder().encode(x);return try JSONDecoder().decode(EERev48InteractiveForensics.self,from:d)==x};#expect(matches)}
 }

@@ -4,6 +4,33 @@ import ElectricalCore
 import CircuitMNA
 import ScenarioEngine
 
+/// Runs `body` on a thread with an explicit larger stack than Swift
+/// Testing's concurrency-executor default, and returns its result.
+/// Needed for JSON round-trip tests on the EERevNN "each revision wraps
+/// the whole previous one" structs: some are large/deep enough that just
+/// constructing one, or JSON-encoding/decoding it, overflows the
+/// executor's small default stack on real Apple platforms — confirmed via
+/// CI crashes (Bus error at ___chkstk_darwin, a genuine stack overflow) on
+/// EERev53SimulationProduction and then EERev64PhysicalInstrumentQualification.
+/// Never reproduced under swift-corelibs-Foundation on Linux. Applied to
+/// every round-trip test on one of these structs, not just the two that
+/// have crashed so far, since the risk scales with how deep/large the
+/// revision's struct is and there's no cheap way to predict the cutoff.
+func runOnLargeStack<T>(stackSize: Int = 16*1024*1024, _ body: @escaping @Sendable () throws -> T) throws -> T {
+    let semaphore = DispatchSemaphore(value: 0)
+    nonisolated(unsafe) var result: T?
+    nonisolated(unsafe) var thrown: Error?
+    let thread = Thread {
+        do { result = try body() } catch { thrown = error }
+        semaphore.signal()
+    }
+    thread.stackSize = stackSize
+    thread.start()
+    semaphore.wait()
+    if let thrown { throw thrown }
+    return result!
+}
+
 @Test func robustSparseColdStartStarter() throws {var b=MotorStarterBench();b.pressStart();let s=try RobustSparseDCSolver().solve(b.circuit());#expect(s.converged);#expect(s.nodeVoltages[BenchNode.coil]>23.9)}
 @Test func scalingHandlesNineOrders(){let c=Circuit(nodeCount:3,resistors:[.init(a:1,b:0,resistance:0.001),.init(a:2,b:0,resistance:1_000_000),.init(a:1,b:2,resistance:10)],voltageSources:[.init(positive:1,negative:0,volts:24)]);let d=CircuitDiagnostics.analyze(c);#expect(d.contains{if case .extremeConductanceRatio = $0{return true};return false})}
 @Test func floatingNodesAreDiagnosed(){let c=Circuit(nodeCount:4,resistors:[.init(a:0,b:1,resistance:10),.init(a:2,b:3,resistance:10)]);let d=CircuitDiagnostics.analyze(c);#expect(d.contains(.floatingNodes([2,3])))}
@@ -460,7 +487,7 @@ import ScenarioEngine
  @Test func alarmRationalizationDetectsFlood(){var r=EEAlarmRationalization();r.floodThresholdPerMinute=3;let a=(0..<3).map{EELiveAlarm(id:"A\($0)",identity:"X",severity:.warning,message:"x",firstSeen:95+Double($0))};#expect(r.flood(a,now:100))}
  @Test func multiFaultIncidentChangesMultipleDomains(){var s=EECausalFacilitySimulation();s.injectIncident(.init(id:"I",rootFaults:["instrument-air-leak","vfd-feeder-open"],consequences:[]));#expect(s.instrumentAir.leakRate>0.2);#expect(!s.power.vfd.breakerClosed)}
  @Test func proceduralGeneratorCreatesSurgeCase(){var s=EECausalFacilitySimulation();s.unit.surgeMargin=0.1;s.generatedCases=EEProceduralCaseGenerator().generate(station:s);#expect(s.generatedCases.contains{$0.id=="CASE-SURGE"})}
- @Test func fullFacilityRoundTrips() throws {var s=EECausalFacilitySimulation();s.tick(seconds:2);let d=try JSONEncoder().encode(s);#expect(try JSONDecoder().decode(EECausalFacilitySimulation.self,from:d)==s)}
+ @Test func fullFacilityRoundTrips() throws {let matches=try runOnLargeStack{()->Bool in var s=EECausalFacilitySimulation();s.tick(seconds:2);let d=try JSONEncoder().encode(s);return try JSONDecoder().decode(EECausalFacilitySimulation.self,from:d)==s};#expect(matches)}
 }
 
 @Suite("Rev39 integrated plant depth") struct Rev39IntegratedPlantDepthTests {
@@ -478,7 +505,7 @@ import ScenarioEngine
  @Test func routeTracksInspectionProgress(){var r=EEInspectionRoute(id:"R",checkpoints:["A","B"]);r.completed.insert("A");#expect(r.progress==0.5)}
  @Test func sparesKnowWhenToReorder(){#expect(EESparePart("X",2,2,4).needsReorder)}
  @Test func causeEffectProducesActions(){let m=EECauseEffectMatrix();#expect(m.actions(for:["surge detected"]).contains("trip COMP-2"))}
- @Test func integratedPlantRoundTrips() throws {var p=EEIntegratedPlantRev39();p.tick(seconds:2);let data=try JSONEncoder().encode(p);let q=try JSONDecoder().decode(EEIntegratedPlantRev39.self,from:data);#expect(q==p)}
+ @Test func integratedPlantRoundTrips() throws {let matches=try runOnLargeStack{()->Bool in var p=EEIntegratedPlantRev39();p.tick(seconds:2);let data=try JSONEncoder().encode(p);return try JSONDecoder().decode(EEIntegratedPlantRev39.self,from:data)==p};#expect(matches)}
  @Test func integratedPlantPropagatesSensorDrift(){var p=EEIntegratedPlantRev39();p.drift.biasPercent=5;p.tick(seconds:0.5);let ai=p.base.automation.channels.first{$0.tag=="PIT401_PV"}!;#expect(ai.value > p.base.unit.dischargePSI)}
 }
 
@@ -497,7 +524,7 @@ import ScenarioEngine
  @Test func valveSignatureShowsStiction(){let s=EEValveSignatureAnalyzer().signature(stiction:0.1,airPSI:100);#expect(s.first{$0.command==10}!.travel==0);#expect(s.last!.travel<100)}
  @Test func calibrationPreservesAsFoundAsLeft(){let r=EECalibrationRecord(identity:"PIT",asFound:[4.2,12.3,20.4],asLeft:[4,12,20]);#expect(r.maxAsFoundError>0.3)}
  @Test func synchronizedIdentitySpansRepresentations(){let p=EEForensicPlantRev40();let x=p.identities[0];#expect(x.bindings[.pAndID] != nil);#expect(x.bindings[.ladder] != nil);#expect(x.bindings[.physical3D] != nil)}
- @Test func rev40RoundTrips() throws {var p=EEForensicPlantRev40();p.tick(seconds:2);let d=try JSONEncoder().encode(p);#expect(try JSONDecoder().decode(EEForensicPlantRev40.self,from:d)==p)}
+ @Test func rev40RoundTrips() throws {let matches=try runOnLargeStack{()->Bool in var p=EEForensicPlantRev40();p.tick(seconds:2);let d=try JSONEncoder().encode(p);return try JSONDecoder().decode(EEForensicPlantRev40.self,from:d)==p};#expect(matches)}
 }
 
 @Suite("Rev41 coal and mining digital twin") struct Rev41CoalMiningTests {
@@ -512,7 +539,7 @@ import ScenarioEngine
  @Test func trainLoadoutConsumesCleanCoal(){var l=EECoalTrainLoadout();let x=l.siloTons;l.loadCar();#expect(l.loadedCars==1);#expect(l.siloTons<x)}
  @Test func coalIdentityCrossReferencesEngineeringViews(){let c=EECoalMiningComplex();#expect(c.identities.contains{$0.drawingRefs["PLC"] != nil && $0.drawingRefs["oneLine"] != nil})}
  @Test func plantElectricalLoadFollowsMaterialFlow(){var c=EECoalMiningComplex();let x=c.electrical.plantMCCAmps;c.tick(seconds:30);#expect(c.electrical.plantMCCAmps>x)}
- @Test func coalComplexRoundTrips() throws {var c=EECoalMiningComplex();c.tick(seconds:30);let d=try JSONEncoder().encode(c);#expect(try JSONDecoder().decode(EECoalMiningComplex.self,from:d)==c)}
+ @Test func coalComplexRoundTrips() throws {let matches=try runOnLargeStack{()->Bool in var c=EECoalMiningComplex();c.tick(seconds:30);let d=try JSONEncoder().encode(c);return try JSONDecoder().decode(EECoalMiningComplex.self,from:d)==c};#expect(matches)}
 }
 
 @Suite("Rev42 coal/mining deep systems") struct Rev42CoalDeepTests {
@@ -532,7 +559,7 @@ import ScenarioEngine
  @Test func thickenerTorqueTracksBed(){var t=EEThickenerDynamics();t.bedPercent=90;t.tick(feedSolidsTPH:200,dt:1);#expect(t.torquePercent>80)}
  @Test func advancedLoadoutIndexesCars(){var l=EEAdvancedTrainLoadout();l.batchLoad();#expect(l.carIndex==1);#expect(l.cars[0].complete)}
  @Test func emergentBeltFaultCreatesWorkOrder(){var x=EECoalMiningRev42();var m=x.deepMines[.northRidge]!;m.belts[0].safety.pullCord=true;x.deepMines[.northRidge]=m;x.tick(seconds:1);#expect(x.workOrders.contains{$0.identity.contains("northRidge")})}
- @Test func rev42RoundTrips() throws {var x=EECoalMiningRev42();x.tick(seconds:2);let d=try JSONEncoder().encode(x);#expect(try JSONDecoder().decode(EECoalMiningRev42.self,from:d)==x)}
+ @Test func rev42RoundTrips() throws {let matches=try runOnLargeStack{()->Bool in var x=EECoalMiningRev42();x.tick(seconds:2);let d=try JSONEncoder().encode(x);return try JSONDecoder().decode(EECoalMiningRev42.self,from:d)==x};#expect(matches)}
 }
 
 @Suite("Rev43 coal forensic physics") struct Rev43CoalForensicTests {
@@ -552,7 +579,7 @@ import ScenarioEngine
  @Test func loadoutRunsSequence(){var l=EEForensicTrainLoadout();for _ in 0..<7{l.step()};#expect(l.car==1)}
  @Test func loadoutPositionBlocksSequence(){var l=EEForensicTrainLoadout();l.step();l.positionErrorM=1;l.step();#expect(l.phase == .position)}
  @Test func rev43IntegratedTick(){var x=EECoalMiningRev43();x.tick(seconds:10);#expect(x.time==10);#expect(x.longwalls[.northRidge]!.shearer.positionM>20)}
- @Test func rev43RoundTrips() throws {var x=EECoalMiningRev43();x.tick(seconds:3);let d=try JSONEncoder().encode(x);#expect(try JSONDecoder().decode(EECoalMiningRev43.self,from:d)==x)}
+ @Test func rev43RoundTrips() throws {let matches=try runOnLargeStack{()->Bool in var x=EECoalMiningRev43();x.tick(seconds:3);let d=try JSONEncoder().encode(x);return try JSONDecoder().decode(EECoalMiningRev43.self,from:d)==x};#expect(matches)}
 }
 
 @Suite("Rev44 coal systems forensic depth") struct Rev44CoalSystemsTests {
@@ -574,7 +601,7 @@ import ScenarioEngine
  @Test func instrumentedLoadoutLoadsCar(){var l=EEInstrumentedTrainLoadout();for _ in 0..<250{l.tick(dt:1)};#expect(l.activeCar>=1);#expect(l.cars[0].loaded)}
  @Test func incidentRecorderFindsNearest(){var r=EECoalIncidentRecorder();r.append(.init(time:10,mine:.northRidge,beltAmps:1,maxIdlerC:2,methanePercent:0,coPPM:0,longwallAFCAmps:3,prepSG:1.4,thickenerTorque:4,loadedCars:0));r.append(.init(time:20,mine:.northRidge,beltAmps:2,maxIdlerC:3,methanePercent:0,coPPM:0,longwallAFCAmps:4,prepSG:1.4,thickenerTorque:5,loadedCars:0));#expect(r.nearest(time:18)?.time==20)}
  @Test func rev44IntegratedRecorder(){var x=EECoalMiningRev44();x.tick(seconds:10);#expect(x.time==10);#expect(x.recorder.frames.count==1);#expect(x.rev43.world == .coalMining)}
- @Test func rev44RoundTrips() throws {var x=EECoalMiningRev44();x.tick(seconds:3);let d=try JSONEncoder().encode(x);#expect(try JSONDecoder().decode(EECoalMiningRev44.self,from:d)==x)}
+ @Test func rev44RoundTrips() throws {let matches=try runOnLargeStack{()->Bool in var x=EECoalMiningRev44();x.tick(seconds:3);let d=try JSONEncoder().encode(x);return try JSONDecoder().decode(EECoalMiningRev44.self,from:d)==x};#expect(matches)}
 }
 
 
@@ -589,7 +616,7 @@ import ScenarioEngine
  @Test func benchUndoRedoRestoresPhysicalState(){var b=EEProductionBench52();let n=b.core.workspace.wires.count;b.transact(.wire,"wire"){_=$0.wire("PS1:+","R1:1")};#expect(b.core.workspace.wires.count==n+1);b.undoLast();#expect(b.core.workspace.wires.count==n);b.redoLast();#expect(b.core.workspace.wires.count==n+1)}
  @Test func openFaultDisablesComponent(){var b=EEProductionBench52();b.inject(.open,component:"R1");#expect(b.core.workspace.components.first{$0.id=="R1"}?.enabled==false);b.resetFault("R1");#expect(b.core.workspace.components.first{$0.id=="R1"}?.enabled==true)}
  @Test func rev52PreservesRegistryAudit(){let r=EERev52TotalAssimilation();#expect(r.goldenAudit.total>0);#expect(r.goldenAudit.duplicateKeys.isEmpty)}
- @Test func rev52RoundTrips() throws {var r=EERev52TotalAssimilation();r.bench.selectedLab = .industrialControls;r.bench.vision.insert(.fuseI2T);let d=try JSONEncoder().encode(r);#expect(try JSONDecoder().decode(EERev52TotalAssimilation.self,from:d)==r)}
+ @Test func rev52RoundTrips() throws {let matches=try runOnLargeStack{()->Bool in var r=EERev52TotalAssimilation();r.bench.selectedLab = .industrialControls;r.bench.vision.insert(.fuseI2T);let d=try JSONEncoder().encode(r);return try JSONDecoder().decode(EERev52TotalAssimilation.self,from:d)==r};#expect(matches)}
 }
 
 @Suite("Rev53 simulation-backed production") struct Rev53SimulationProductionTests {
@@ -604,40 +631,12 @@ import ScenarioEngine
  @Test func relayMechanicsCloses(){var r=EERelayMechanics53();r.coilVolts=24;for _ in 0..<20{r.step(dt:0.01)};#expect(r.closed)}
  @Test func breadboardRowsShareNode(){let b=EEBreadboard53();#expect(b.node(row:5,column:0)==b.node(row:5,column:4));#expect(b.node(row:5,column:0) != b.node(row:5,column:6))}
  @Test func embeddedRuntimeSteps(){var e=EEEmbeddedRuntime53();let p:[EEEmbeddedInstruction53]=[.set("OUT",1),.add("OUT",2)];e.step(p);e.step(p);#expect(e.registers["OUT"]==3);#expect(e.halted)}
- // EERev53SimulationProduction's synthesized Codable is 7 .base-wrapped
- // revisions deep, bottoming out in two large simulation subsystems, which
- // makes it an enormous value type (everything is stored inline, no
- // indirection). The first fix attempt only moved the JSON encode/decode
- // to a bigger-stack thread and still crashed identically — the real CI
- // crash backtrace shows the overflow happens in the test's own macro-
- // generated entry closure, before that thread is even spawned: just
- // constructing `var r = EERev53SimulationProduction()` as a local on the
- // Swift Testing concurrency-executor's small default stack is enough to
- // overflow it (Bus error at ___chkstk_darwin — a real stack overflow, not
- // a thrown error; Linux's swift-corelibs-Foundation never reproduced this
- // because the crash isn't in Foundation at all). Fix: construct the
- // struct, mutate it, and encode/decode it all inside the big-stack
- // thread, so nothing of this size ever touches the fragile stack.
  @Test func rev53RoundTrips() throws {
-  let semaphore=DispatchSemaphore(value:0)
-  // Safe despite the compiler's ordinary Sendable checking not being able to
-  // see it: semaphore.wait() below only returns after signal() below has
-  // run, so the write on the spawned thread and the read after wait() can
-  // never actually overlap.
-  nonisolated(unsafe) var decodedFrequency:Double?
-  nonisolated(unsafe) var thrown:Error?
-  let thread=Thread{
-   do{
-    var r=EERev53SimulationProduction();r.generator.frequencyHz=1234;r.relay.coilVolts=24
-    let d=try JSONEncoder().encode(r)
-    decodedFrequency=try JSONDecoder().decode(EERev53SimulationProduction.self,from:d).generator.frequencyHz
-   }catch{thrown=error}
-   semaphore.signal()
+  let decodedFrequency=try runOnLargeStack{()->Double in
+   var r=EERev53SimulationProduction();r.generator.frequencyHz=1234;r.relay.coilVolts=24
+   let d=try JSONEncoder().encode(r)
+   return try JSONDecoder().decode(EERev53SimulationProduction.self,from:d).generator.frequencyHz
   }
-  thread.stackSize=16*1024*1024
-  thread.start()
-  semaphore.wait()
-  if let thrown{throw thrown}
   #expect(decodedFrequency==1234)
  }
 }
@@ -655,7 +654,7 @@ import ScenarioEngine
  @Test func embeddedIOClosesPhysicalLoop(){var e=EEEmbeddedIO54();e.writeGPIO("OUT",true);e.writePWM("MOTOR",0.6);e.sampleADC("AI0",nodeVoltage:2.5);#expect(e.gpio["OUT"]==true);#expect(e.pwm["MOTOR"]==0.6);#expect(e.adc["AI0"]==0.5)}
  @Test func embeddedCANIsBounded(){var e=EEEmbeddedIO54();e.sendCAN(id:0x123,data:Array(0..<12));#expect(e.canTX[0x123]?.count==8)}
  @Test func arbitraryAdvancedDevicesCanBePlaced(){var b=EEUnifiedBench54();b.addAdvanced(.init(id:"L1",kind:.inductor,terminals:["L1:1","L1:2"],value:0.01));b.addAdvanced(.init(id:"Q1",kind:.mosfetN,terminals:["Q1:G","Q1:D","Q1:S"],value:1));#expect(b.advanced.count==2)}
- @Test func rev54RoundTrips() throws {var r=EERev54UnifiedSimulation();r.bench.generator.frequencyHz=777;r.bench.embedded.writeGPIO("X",true);let d=try JSONEncoder().encode(r);let x=try JSONDecoder().decode(EERev54UnifiedSimulation.self,from:d);#expect(x.bench.generator.frequencyHz==777);#expect(x.bench.embedded.gpio["X"]==true)}
+ @Test func rev54RoundTrips() throws {let(freq,gpio)=try runOnLargeStack{()->(Double,Bool?) in var r=EERev54UnifiedSimulation();r.bench.generator.frequencyHz=777;r.bench.embedded.writeGPIO("X",true);let d=try JSONEncoder().encode(r);let x=try JSONDecoder().decode(EERev54UnifiedSimulation.self,from:d);return(x.bench.generator.frequencyHz,x.bench.embedded.gpio["X"])};#expect(freq==777);#expect(gpio==true)}
 }
 
 @Suite("Rev55 numerical credibility ceiling") struct Rev55NumericalCredibilityTests {
@@ -674,7 +673,7 @@ import ScenarioEngine
  @Test func embeddedTimersAndInterrupts(){var e=EEEmbeddedHardware55();e.tick(10);e.interrupt("ADC");#expect(e.timerTicks==10);#expect(e.interrupts["ADC"]==1)}
  @Test func physicalCANHasParallelTermination(){let e=EEEmbeddedHardware55();#expect(abs(e.canEquivalentTermination-60)<1e-9)}
  @Test func goldenCorpusPasses(){var c=EEGoldenCircuitCorpus55();c.run();#expect(c.cases.count>=4);#expect(c.passed)}
- @Test func rev55RoundTrips() throws {var r=EERev55NumericalCredibility();r.embedded.tick(42);r.corpus.run();let d=try JSONEncoder().encode(r);let x=try JSONDecoder().decode(EERev55NumericalCredibility.self,from:d);#expect(x.embedded.timerTicks==42);#expect(x.corpus.passed)}
+ @Test func rev55RoundTrips() throws {let(ticks,passed)=try runOnLargeStack{()->(UInt64,Bool) in var r=EERev55NumericalCredibility();r.embedded.tick(42);r.corpus.run();let d=try JSONEncoder().encode(r);let x=try JSONDecoder().decode(EERev55NumericalCredibility.self,from:d);return(x.embedded.timerTicks,x.corpus.passed)};#expect(ticks==42);#expect(passed)}
 }
 
 @Suite("Rev56 numerical validation and mastery training") struct Rev56NumericalTrainingTests {
@@ -687,7 +686,7 @@ import ScenarioEngine
  @Test func safeEvidenceBasedAssessmentUnlocks(){var e=EETrainingEngine56();let id="fundamentals-1";let r=e.assess(lessonID:id,evidence:5,unsafe:0,hints:0,rootCause:true,verified:true);#expect(r.score>=0.75);#expect(e.completed.contains(id))}
  @Test func unsafeActionCapsAssessment(){var e=EETrainingEngine56();let r=e.assess(lessonID:"fundamentals-1",evidence:20,unsafe:1,hints:0,rootCause:true,verified:true);#expect(r.score<0.5);#expect(!e.completed.contains("fundamentals-1"))}
  @Test func masteryUpdatesFromEvidence(){var e=EETrainingEngine56();_ = e.assess(lessonID:"fundamentals-1",evidence:5,unsafe:0,hints:0,rootCause:true,verified:true);#expect((e.mastery[.theory]?.mastery ?? 0)>0)}
- @Test func rev56RoundTrips() throws {var r=EERev56NumericalTrainingExpansion();r.references.runAll();_ = r.training.assess(lessonID:"fundamentals-1",evidence:5,unsafe:0,hints:0,rootCause:true,verified:true);let d=try JSONEncoder().encode(r);let x=try JSONDecoder().decode(EERev56NumericalTrainingExpansion.self,from:d);#expect(x.references.passed);#expect(x.training.completed.contains("fundamentals-1"))}
+ @Test func rev56RoundTrips() throws {let(passed,hasFundamentals)=try runOnLargeStack{()->(Bool,Bool) in var r=EERev56NumericalTrainingExpansion();r.references.runAll();_ = r.training.assess(lessonID:"fundamentals-1",evidence:5,unsafe:0,hints:0,rootCause:true,verified:true);let d=try JSONEncoder().encode(r);let x=try JSONDecoder().decode(EERev56NumericalTrainingExpansion.self,from:d);return(x.references.passed,x.training.completed.contains("fundamentals-1"))};#expect(passed);#expect(hasFundamentals)}
 }
 
 @Suite("Rev57 deep comprehensive training") struct Rev57DeepTrainingTests {
@@ -709,7 +708,7 @@ import ScenarioEngine
  @Test func capstonesCrossDomains(){let c=EEUltraTrainingCatalog58();#expect(c.capstones.count>=4);#expect(c.capstones.allSatisfy{$0.domains.count>=4 && $0.requiredEvidence.count>=4})}
  @Test func mikeHoltExtensionIsProvenanceOnly(){let c=EEUltraTrainingCatalog58();let r=c.references.first{$0.id=="MH-EXAM"};#expect(r != nil);#expect(r!.note.contains("not reproduced"))}
  @Test func initialUnlocksRespectPrerequisites(){let c=EEUltraTrainingCatalog58();let u=c.unlocked(completed:[]);#expect(!u.isEmpty);#expect(u.allSatisfy{$0.prerequisites.isEmpty})}
- @Test func transcriptRoundTrips() throws {var r=EERev58UltraTrainingAcademy();r.transcript.completedNodes.insert(r.catalog.nodes[0].id);let d=try JSONEncoder().encode(r);let x=try JSONDecoder().decode(EERev58UltraTrainingAcademy.self,from:d);#expect(x.transcript.completionCount==1);#expect(x.catalog.nodes.count==r.catalog.nodes.count)}
+ @Test func transcriptRoundTrips() throws {let(completionCount,nodesMatch)=try runOnLargeStack{()->(Int,Bool) in var r=EERev58UltraTrainingAcademy();r.transcript.completedNodes.insert(r.catalog.nodes[0].id);let d=try JSONEncoder().encode(r);let x=try JSONDecoder().decode(EERev58UltraTrainingAcademy.self,from:d);return(x.transcript.completionCount,x.catalog.nodes.count==r.catalog.nodes.count)};#expect(completionCount==1);#expect(nodesMatch)}
 }
 
 @Suite("Rev59 career-scale training") struct Rev59CareerScaleTrainingTests {
@@ -721,7 +720,7 @@ import ScenarioEngine
  @Test func oralDefenseRequiresConceptsAndSafety(){let o=EETrainingCatalog59().oralDefenses[0];#expect(o.grade(concepts:o.requiredConcepts,evidenceCount:3,unsafeClaims:0)>0.95);#expect(o.grade(concepts:o.requiredConcepts,evidenceCount:3,unsafeClaims:1)<0.5)}
  @Test func instructorDashboardTracksScoresAndSafety(){var d=EEInstructorDashboard59();d.record(learner:"A",item:"x",score:0.8);d.record(learner:"A",item:"y",score:1,unsafe:1);#expect(d.average(for:"A")>0.89);#expect(d.safetyEvents["A"]==1)}
  @Test func scenarioAuthorNeverRevealsFault(){let a=EEInstructorScenarioAuthor59().make(id:"s",title:"t",domain:.troubleshooting,assets:["M1"],faultFamilies:["highResistance"],documents:["elementary"],instruments:["DMM"],objectives:["diagnose"],evidence:["measurement"],safety:[.hazardRecognition],seed:1);#expect(a.forbiddenReveals.contains("fault identity"));#expect(!a.requiredEvidence.isEmpty)}
- @Test func rev59RoundTrips() throws {let r=EERev59CareerScaleTraining();let d=try JSONEncoder().encode(r);let x=try JSONDecoder().decode(EERev59CareerScaleTraining.self,from:d);#expect(x.catalog.pathways.count==r.catalog.pathways.count);#expect(x.catalog.base.nodes.count>=700)}
+ @Test func rev59RoundTrips() throws {let(pathwaysMatch,nodeCount)=try runOnLargeStack{()->(Bool,Int) in let r=EERev59CareerScaleTraining();let d=try JSONEncoder().encode(r);let x=try JSONDecoder().decode(EERev59CareerScaleTraining.self,from:d);return(x.catalog.pathways.count==r.catalog.pathways.count,x.catalog.base.nodes.count)};#expect(pathwaysMatch);#expect(nodeCount>=700)}
 }
 
 @Suite("Rev60 six-pathway professional academy") struct Rev60SixPathwayAcademyTests {
@@ -731,7 +730,7 @@ import ScenarioEngine
  @Test func safetyGatesAreEmbedded(){let a=EEProfessionalAcademyCatalog60();#expect(a.practicals.allSatisfy{$0.safetyGates.contains(.verifyDeenergized)})}
  @Test func crossCareerUsesSameAssetDifferentPerspective(){let a=EEProfessionalAcademyCatalog60();let s=a.crossCareer.first!;#expect(s.perspectives.count==6)}
  @Test func transcriptRequiresSafety(){let a=EEProfessionalAcademyCatalog60();var t=EEPathwayTranscript60(path:.apprenticeElectrician);for x in a.topics.filter({$0.path == .apprenticeElectrician && $0.band.rawValue <= 1}){t.topicScores[x.id]=0.9};#expect(t.ready(for:.foundation,catalog:a));t.unsafeEvents=1;#expect(!t.ready(for:.foundation,catalog:a))}
- @Test func rev60RoundTrips() throws {let r=EERev60SixPathwayAcademy();let d=try JSONEncoder().encode(r);let x=try JSONDecoder().decode(EERev60SixPathwayAcademy.self,from:d);#expect(x.academy.topics.count==r.academy.topics.count);#expect(x.academy.practicals.count==72)}
+ @Test func rev60RoundTrips() throws {let(topicsMatch,practicals)=try runOnLargeStack{()->(Bool,Int) in let r=EERev60SixPathwayAcademy();let d=try JSONEncoder().encode(r);let x=try JSONDecoder().decode(EERev60SixPathwayAcademy.self,from:d);return(x.academy.topics.count==r.academy.topics.count,x.academy.practicals.count)};#expect(topicsMatch);#expect(practicals==72)}
 }
 
 @Suite("Rev61 I&E and Controls deep academy") struct Rev61IEControlsDeepAcademyTests {
@@ -741,7 +740,7 @@ import ScenarioEngine
  @Test func practicalsAreLargeAndEvidenceDriven(){let a=EEDeepAcademy61();#expect(a.practicals.count==120);#expect(a.totalPracticalVariants>=15000);#expect(a.practicals.allSatisfy{$0.requiredEvidence.contains("root cause") && $0.requiredEvidence.contains("as-left proof")})}
  @Test func ieHasProcessAndCalibrationDepth(){let a=EEDeepAcademy61();#expect(a.ie.tracks[.calibrationMetrology]?.count ?? 0 >= 32);#expect(a.ie.tracks[.naturalGas]?.count ?? 0 >= 32);#expect(a.ie.tracks[.coalMining]?.count ?? 0 >= 32)}
  @Test func controlsHasNetworkAndForensicDepth(){let a=EEDeepAcademy61();#expect(a.controls.tracks[.networkForensics]?.count ?? 0 >= 32);#expect(a.controls.tracks[.controlsForensics]?.count ?? 0 >= 32);#expect(a.controls.tracks[.can]?.contains{$0.instrumentFamilies.contains("CAN analyzer")} ?? false)}
- @Test func rev61RoundTrips() throws {let r=EERev61IEControlsDeepAcademy();let d=try JSONEncoder().encode(r);let x=try JSONDecoder().decode(EERev61IEControlsDeepAcademy.self,from:d);#expect(x.deep.ieNodeCount==r.deep.ieNodeCount);#expect(x.deep.controlsNodeCount==r.deep.controlsNodeCount);#expect(x.deep.practicals.count==120)}
+ @Test func rev61RoundTrips() throws {let(ieMatch,controlsMatch,practicals)=try runOnLargeStack{()->(Bool,Bool,Int) in let r=EERev61IEControlsDeepAcademy();let d=try JSONEncoder().encode(r);let x=try JSONDecoder().decode(EERev61IEControlsDeepAcademy.self,from:d);return(x.deep.ieNodeCount==r.deep.ieNodeCount,x.deep.controlsNodeCount==r.deep.controlsNodeCount,x.deep.practicals.count)};#expect(ieMatch);#expect(controlsMatch);#expect(practicals==120)}
 }
 
 @Suite("Rev63 integrated I&E and controls simulation") struct Rev63IntegratedIEControlsTests {
@@ -755,7 +754,7 @@ import ScenarioEngine
  @Test func canTerminationShowsMissingTerminator(){var c=EECANPhysical63();#expect(c.healthyTermination);c.terminationB=1e12;#expect(!c.healthyTermination);#expect(c.measuredResistance>100)}
  @Test func integratedRigCreatesSynchronizedReplay(){var r=EEIntegratedLoopRig63();r.impulse.processPressure=150;for _ in 0..<20{r.step(dt:0.05)};#expect(r.replay.frames.count==20);#expect(r.replay.frames.last!.values[.rawAI] != nil);#expect(r.plc.scanCount==20)}
  @Test func boardRequiresEvidenceAndProof(){var b=EEQualificationBoard63();b.diagnosed=true;b.repaired=true;b.recommissioned=true;b.documented=true;#expect(!b.complete);for i in 0..<6{b.evidence.append(.init(id:"e\(i)",time:Double(i),testPointID:"tp",evidence:.voltage,value:24,text:"e",provenance:"simulation"))};#expect(b.complete)}
- @Test func rev63RoundTrips() throws {var r=EERev63IntegratedIEControlsSimulation();r.board.rig.step(dt:0.1);let d=try JSONEncoder().encode(r);let x=try JSONDecoder().decode(EERev63IntegratedIEControlsSimulation.self,from:d);#expect(x.board.rig.replay.frames.count==1)}
+ @Test func rev63RoundTrips() throws {let frameCount=try runOnLargeStack{()->Int in var r=EERev63IntegratedIEControlsSimulation();r.board.rig.step(dt:0.1);let d=try JSONEncoder().encode(r);return try JSONDecoder().decode(EERev63IntegratedIEControlsSimulation.self,from:d).board.rig.replay.frames.count};#expect(frameCount==1)}
 }
 
 @Suite("Rev64 physical instrument qualification") struct Rev64PhysicalInstrumentQualificationTests {
@@ -767,7 +766,7 @@ import ScenarioEngine
  @Test func firstDivergenceFindsImpulseFault(){var b=EEQualificationBoard63();b.rig.impulse.processPressure=150;b.rig.impulse.sensedPressure=100;#expect(EEFirstDivergenceAnalyzer64.analyze(b)?.layer == .impulse)}
  @Test func scenarioDefinitionsDecode() throws {let j="[{\"id\":\"x\",\"title\":\"Loop\",\"assets\":[\"PIT\"],\"faultFamilies\":[\"drift\"],\"documents\":[\"loop\"],\"instruments\":[\"dcVolts\"],\"seed\":1}]".data(using:.utf8)!;#expect(try EEScenarioLoader64.decode(j).count==1)}
  @Test func evidenceComesFromInstrument(){var r=EEQualificationRuntime64();r.instrument.place(.red,at:"+");r.instrument.place(.black,at:"-");r.captureEvidence(id:"e");#expect(r.board.evidence.count==1);#expect(r.board.evidence[0].provenance.contains("simulation truth"))}
- @Test func rev64RoundTrips() throws {var r=EERev64PhysicalInstrumentQualification();r.runtime.tick(dt:0.1);let d=try JSONEncoder().encode(r);let x=try JSONDecoder().decode(EERev64PhysicalInstrumentQualification.self,from:d);#expect(x.runtime.microscope.traces.count==1)}
+ @Test func rev64RoundTrips() throws {let traceCount=try runOnLargeStack{()->Int in var r=EERev64PhysicalInstrumentQualification();r.runtime.tick(dt:0.1);let d=try JSONEncoder().encode(r);return try JSONDecoder().decode(EERev64PhysicalInstrumentQualification.self,from:d).runtime.microscope.traces.count};#expect(traceCount==1)}
 }
 
 @Suite("Rev65 deep qualification and architecture") struct Rev65DeepQualificationTests {
@@ -779,7 +778,7 @@ import ScenarioEngine
  @Test func canWaveformReflectsTermination(){let good=EECANScope65.capture(.init());var bad=EECANPhysical63();bad.terminationB=1e12;let degraded=EECANScope65.capture(bad);#expect(good.canH != degraded.canH)}
  @Test func worldsKeepDifferentHazardResearch(){let g=EEHazardTraining65.assessment(for:.naturalGas);let c=EEHazardTraining65.assessment(for:.coalMining);#expect(g.environment != c.environment);#expect(g.requiredResearch != c.requiredResearch)}
  @Test func forensicCursorFindsNearest(){var r=EEIntegratedLoopRig63();for _ in 0..<5{r.step(dt:0.1)};var c=EEForensicCursor65();c.time=0.31;#expect(c.nearest(in:r.replay) != nil)}
- @Test func rev65RoundTrips() throws {var r=EERev65DeepQualificationAndArchitecture();r.tick(dt:0.1);let d=try JSONEncoder().encode(r);let x=try JSONDecoder().decode(EERev65DeepQualificationAndArchitecture.self,from:d);#expect(x.workspace.snapshot.time>0)}
+ @Test func rev65RoundTrips() throws {let time=try runOnLargeStack{()->Double in var r=EERev65DeepQualificationAndArchitecture();r.tick(dt:0.1);let d=try JSONEncoder().encode(r);return try JSONDecoder().decode(EERev65DeepQualificationAndArchitecture.self,from:d).workspace.snapshot.time};#expect(time>0)}
 }
 
 @Suite("Rev66 deeper physical controls") struct Rev66DeepPhysicalControlsTests {
@@ -792,7 +791,7 @@ import ScenarioEngine
  @Test func registerCaptureIsDeterministic(){var n=EENetwork63();n.packetLoss=0.2;#expect(EERegisterCapture66.capture(network:n)==EERegisterCapture66.capture(network:n))}
  @Test func canQualityDropsWithBadTermination(){let t=EECANBitTiming66();let good=EECANPhysical63();var bad=good;bad.terminationB=1e12;#expect(t.quality(can:good)>t.quality(can:bad))}
  @Test func forensicRingIsBounded(){var r=EEForensicRing66(capacity:3);for i in 0..<5{r.append(.init(id:i,time:Double(i),values:[:]))};#expect(r.frames.count==3);#expect(r.frames.first?.time==2)}
- @Test func rev66RoundTrips() throws {var r=EERev66DeepPhysicalControls();r.tick(dt:0.1);let d=try JSONEncoder().encode(r);let x=try JSONDecoder().decode(EERev66DeepPhysicalControls.self,from:d);#expect(x.ladder.frames.count==1);#expect(x.forensic.frames.count==1)}
+ @Test func rev66RoundTrips() throws {let(ladderFrames,forensicFrames)=try runOnLargeStack{()->(Int,Int) in var r=EERev66DeepPhysicalControls();r.tick(dt:0.1);let d=try JSONEncoder().encode(r);let x=try JSONDecoder().decode(EERev66DeepPhysicalControls.self,from:d);return(x.ladder.frames.count,x.forensic.frames.count)};#expect(ladderFrames==1);#expect(forensicFrames==1)}
 }
 
 @Suite("Rev67 integrated technical workbench") struct Rev67IntegratedTechnicalWorkbenchTests {
@@ -813,7 +812,7 @@ import ScenarioEngine
  @Test func protocolTimelinePersistsEvents(){var p=EEProtocolTimeline68();p.append(time:1,layer:"PLC",operation:"read",address:10,value:42);#expect(p.events.first?.address==10)}
  @Test func canCommonModeMovesBothLines(){var f=EECANFault68();f.commonModeV=1;let a=EECANBitLab68.frame(bits:[true],fault:f)[0];#expect(a.canH>4);#expect(a.canL>2)}
  @Test func synchronizedCursorUsesForensicBuffer(){var b=EEForensicCircularBuffer67(capacity:3);b.append(.init(id:1,time:1,values:[:]));var c=EESynchronizedCursor68();c.time=1.1;#expect(c.frame(in:b)?.id==1)}
- @Test func rev68RoundTrips() throws {var r=EERev68SynchronizedForensicLab();r.tick(dt:0.05,activity:0.8);let d=try JSONEncoder().encode(r);let x=try JSONDecoder().decode(EERev68SynchronizedForensicLab.self,from:d);#expect(x.protocols.events.count==1)}
+ @Test func rev68RoundTrips() throws {let eventCount=try runOnLargeStack{()->Int in var r=EERev68SynchronizedForensicLab();r.tick(dt:0.05,activity:0.8);let d=try JSONEncoder().encode(r);return try JSONDecoder().decode(EERev68SynchronizedForensicLab.self,from:d).protocols.events.count};#expect(eventCount==1)}
 }
 
 @Suite("Rev69 unified industrial training facility")
