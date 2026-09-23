@@ -43,7 +43,7 @@ public struct EERev90AnimatedBucket: View {
             }.frame(height:160)
             VStack(spacing:7) {
                 Button(doorOpen ? "CLOSE DOOR":"OPEN DOOR"){withAnimation(.spring(response:0.35,dampingFraction:0.72)){doorOpen.toggle()}}.buttonStyle(.borderedProminent)
-                Label(frame.protectionConducting ? "CONTACTOR PULLED IN":"CONTACTOR DROPPED","bolt.horizontal.circle").font(.caption2)
+                Label(frame.protectionConducting ? "CONTACTOR PULLED IN":"CONTACTOR DROPPED",systemImage:"bolt.horizontal.circle").font(.caption2)
                 Text(String(format:"CTRL %.1f V",frame.controlVoltageV)).font(.caption.monospaced())
             }.frame(width:130)
         }.accessibilityIdentifier("rev90.animatedBucket")
