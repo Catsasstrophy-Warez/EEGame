@@ -25,6 +25,8 @@ public struct Rev72IntegratedLabView: View {
     @State private var scopeCurrentBuffer = TelemetryRingBuffer(capacity:160)
     @State private var scopeVoltageRange = 1.0
     @State private var scopeCurrentRange = 0.05
+    @State private var scopeFrozen = false
+    @State private var realityCamera = RealitySceneCameraState()
     @State private var simulation = EESimulationCoordinator75()
     @State private var tab = 0
     @State private var selectedIdentity = "TB1:12"
@@ -57,7 +59,7 @@ public struct Rev72IntegratedLabView: View {
         .tint(EEIndustrialPalette.energized)
         .sheet(isPresented:$showRealityScene) {
             TimelineView(.animation(minimumInterval:1.0/15.0)) { _ in
-                RealitySceneView(energized:simulation.snapshot.currentA>0,voltage:simulation.snapshot.terminalVoltage)
+                RealitySceneView(energized:simulation.snapshot.currentA>0,voltage:simulation.snapshot.terminalVoltage,fault:circuitFaultVisual,camera:$realityCamera)
             }
         }
     }
@@ -110,27 +112,17 @@ public struct Rev72IntegratedLabView: View {
         return String(format:"%.0f ms/div   AUTO %.2fV / %.2fA",perDivisionMs,scopeVoltageRange,scopeCurrentRange)
     }
 
-    private var scopeAxisOverlay: some View {
-        HStack {
-            VStack {
-                Text(String(format:"+%.2fV",scopeVoltageRange))
-                Spacer()
-                Text("0V")
-                Spacer()
-                Text(String(format:"-%.2fV",scopeVoltageRange))
-            }.foregroundStyle(Color(red:0.2,green:0.85,blue:1.0))
-            Spacer()
-            VStack {
-                Text(String(format:"+%.2fA",scopeCurrentRange))
-                Spacer()
-                Text("0A")
-                Spacer()
-                Text(String(format:"-%.2fA",scopeCurrentRange))
-            }.foregroundStyle(Color(red:1.0,green:0.65,blue:0.15))
+    /// Maps the Field workspace's facility fault picker onto RealityScene's
+    /// generic fault presentation — the one real fault signal already live
+    /// in this view, shared by the 3D scene and the scope's fault marker.
+    private var circuitFaultVisual: CircuitFaultVisual {
+        switch facilityFault88 {
+        case .none: return .none
+        case .openPhase: return .openCircuit
+        case .singleLineGround, .doubleLineGround: return .groundFault
+        case .lineLine, .threePhase: return .shortCircuit
+        case .reversedSequence: return .warning
         }
-        .font(.system(size:7,weight:.semibold,design:.monospaced))
-        .padding(4)
-        .accessibilityIdentifier("quickBench.scope.axis")
     }
 
     private var workspacePicker: some View {
@@ -206,27 +198,33 @@ public struct Rev72IntegratedLabView: View {
                 }.accessibilityIdentifier("quickBench.dmm")
                 EEInstrumentPanel75("Oscilloscope",subtitle:"SCOPE-1  •  CH1 VOLTAGE  •  CH2 CURRENT") {
                     TimelineView(.animation(minimumInterval:1.0/30.0)) { timeline in
-                        ZStack {
-                            TelemetryWaveformView(traces:[
-                                .init(samples:normalized(scopeVoltageBuffer.values,by:scopeVoltageRange),color:[0.2,0.85,1.0,1.0]),
-                                .init(samples:normalized(scopeCurrentBuffer.values,by:scopeCurrentRange),color:[1.0,0.65,0.15,1.0])
-                            ])
-                            .onChange(of:timeline.date) { _,_ in
-                                let voltageSample = Float(simulation.snapshot.terminalVoltage)
-                                let currentSample = Float(simulation.snapshot.currentA)
-                                scopeVoltageBuffer.append(voltageSample)
-                                scopeCurrentBuffer.append(currentSample)
-                                scopeVoltageRange = decayedRange(current:scopeVoltageRange,newestSample:voltageSample,minimumRange:scopeMinVoltageRange)
-                                scopeCurrentRange = decayedRange(current:scopeCurrentRange,newestSample:currentSample,minimumRange:scopeMinCurrentRange)
-                            }
-                            scopeAxisOverlay
+                        TelemetryScopeView(
+                            channels:[
+                                .init(trace:.init(samples:normalized(scopeVoltageBuffer.values,by:scopeVoltageRange),color:[0.2,0.85,1.0,1.0]),unitLabel:"V",fullScale:scopeVoltageRange,side:.leading),
+                                .init(trace:.init(samples:normalized(scopeCurrentBuffer.values,by:scopeCurrentRange),color:[1.0,0.65,0.15,1.0]),unitLabel:"A",fullScale:scopeCurrentRange,side:.trailing)
+                            ],
+                            faultActive:circuitFaultVisual != .none,
+                            faultLabel:facilityFault88.rawValue.uppercased()
+                        )
+                        .onChange(of:timeline.date) { _,_ in
+                            guard !scopeFrozen else { return }
+                            let voltageSample = Float(simulation.snapshot.terminalVoltage)
+                            let currentSample = Float(simulation.snapshot.currentA)
+                            scopeVoltageBuffer.append(voltageSample)
+                            scopeCurrentBuffer.append(currentSample)
+                            scopeVoltageRange = decayedRange(current:scopeVoltageRange,newestSample:voltageSample,minimumRange:scopeMinVoltageRange)
+                            scopeCurrentRange = decayedRange(current:scopeCurrentRange,newestSample:currentSample,minimumRange:scopeMinCurrentRange)
                         }
                     }
                     .frame(height:90)
                     .background(.black.opacity(0.7),in:RoundedRectangle(cornerRadius:8))
                     .accessibilityIdentifier("quickBench.scope.telemetry")
                     HStack {
-                        Text("CH1").foregroundStyle(EEIndustrialPalette.energized)
+                        Button { scopeFrozen.toggle() } label: {
+                            Image(systemName:scopeFrozen ? "play.fill" : "pause.fill")
+                            Text(scopeFrozen ? "FROZEN" : "CH1")
+                        }.buttonStyle(.plain).foregroundStyle(scopeFrozen ? EEIndustrialPalette.amber : EEIndustrialPalette.energized)
+                            .accessibilityIdentifier("quickBench.scope.freeze")
                         Spacer()
                         Text(scopeTimebaseLabel).foregroundStyle(.secondary)
                     }.font(.caption2.monospaced())
