@@ -27,7 +27,13 @@ public struct EELadderScanFrame66:Identifiable,Sendable,Codable,Equatable{public
 public struct EEPLCScanRecorder66:Sendable,Codable,Equatable{public var frames:[EELadderScanFrame66]=[];public init(){};public mutating func append(time:Double,inputs:[String:Bool],rungs:[String:Bool],outputs:[String:Bool]){frames.append(.init(id:frames.count,time:time,inputs:inputs,rungPower:rungs,outputs:outputs))}}
 
 public struct EERegisterTransaction66:Identifiable,Sendable,Codable,Equatable{public var id:Int;public var time:Double;public var function:String;public var address:Int;public var value:Int;public var delivered:Bool;public var latencyMS:Double}
-public enum EERegisterCapture66{public static func capture(network:EENetwork63,count:Int=32)->[EERegisterTransaction66]{(0..<count).map{.init(id:$0,time:Double($0)*0.05,function:$0%2==0 ? "read":"write",address:40001+($0%8),value:100+$0,delivered:network.delivered(sequence:$0),latencyMS:network.latencyMS)}}}
+public enum EERegisterCapture66{public static func capture(network:EENetwork63,count:Int=32)->[EERegisterTransaction66]{
+    (0..<count).map { i -> EERegisterTransaction66 in
+        let function:String = i%2==0 ? "read":"write"
+        let address:Int = 40001+(i%8)
+        return EERegisterTransaction66(id:i,time:Double(i)*0.05,function:function,address:address,value:100+i,delivered:network.delivered(sequence:i),latencyMS:network.latencyMS)
+    }
+}}
 
 public struct EECANBitTiming66:Sendable,Codable,Equatable{public var nominalBitRate=500_000.0;public var samplePoint=0.8;public var propagationDelayNS=100.0;public var commonModeLimitV=2.0;public init(){};public func quality(can:EECANPhysical63)->Double{let termination=can.healthyTermination ? 1.0:max(0,1-abs(can.measuredResistance-60)/120);let common=max(0,1-abs(can.commonModeOffsetV)/max(0.1,commonModeLimitV));let timing=max(0,1-propagationDelayNS/(1e9/nominalBitRate));return termination*common*timing}}
 
