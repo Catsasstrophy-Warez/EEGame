@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  # Fast feedback on every push: builds/tests everything SwiftPM can build
+  # without Xcode (ElectricalCore, CircuitMNA, ScenarioEngine, and the
+  # platform-independent pure logic inside RealityScene/MetalTelemetry —
+  # their SwiftUI/RealityKit/MetalKit-guarded code compiles to nothing here,
+  # by design, since those APIs don't exist on Linux). Also runs the
+  # project's own Python physics/reachability validators.
+  linux-swiftpm:
+    runs-on: ubuntu-latest
+    container: swift:6.0
+    steps:
+      - uses: actions/checkout@v4
+      - name: swift build (all targets)
+        run: swift build
+      - name: swift test (all targets)
+        run: swift test
+      - name: Python validators
+        run: |
+          for f in Scripts/validate_causal_depth86.py \
+                   Scripts/validate_continuous_causal_machine85.py \
+                   Scripts/validate_unified_truth.py \
+                   Scripts/validate_reality_scene.py \
+                   Scripts/validate_metal_telemetry.py \
+                   Scripts/validate_causal_interaction93.py \
+                   Scripts/validate_facility_power88.py \
+                   Scripts/validate_immersive_twin.py \
+                   Scripts/validate_immersive_visuals91.py \
+                   Scripts/validate_physical_commissioning.py \
+                   Scripts/validate_physical_interaction90.py \
+                   Scripts/validate_physical_network87.py \
+                   Scripts/validate_production_art92.py \
+                   Scripts/validate_reality_twin.py \
+                   Scripts/validate_visual_fidelity89.py; do
+            echo "== $f =="
+            python3 "$f"
+          done
+
+  # Authoritative check: the SwiftUI/RealityKit/Metal code the Linux job
+  # can't see at all. This is the job that would have caught the
+  # RealityView update-closure arity bug and the missing alpha-blending
+  # bug, both of which shipped once already because no CI existed to catch
+  # them before a manual Xcode build did.
+  macos-xcode:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.app
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate Xcode project
+        run: xcodegen generate
+      - name: Build for iOS Simulator
+        run: |
+          xcodebuild -project ElectricEngineerGame.xcodeproj \
+            -scheme ElectricEngineerGame \
+            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            build \
+            CODE_SIGNING_ALLOWED=NO
+      - name: Run unit tests
+        run: |
+          xcodebuild -project ElectricEngineerGame.xcodeproj \
+            -scheme ElectricEngineerGame \
+            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            test \
+            CODE_SIGNING_ALLOWED=NO
+
+  swiftlint:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install SwiftLint
+        run: brew install swiftlint
+      - name: Lint
+        run: swiftlint lint --quiet

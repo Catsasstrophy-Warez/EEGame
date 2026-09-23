@@ -1,6 +1,6 @@
-#if canImport(MetalKit) && canImport(SwiftUI)
-import MetalKit
-import SwiftUI
+// Pure logic below has no MetalKit/SwiftUI dependency and stays outside the
+// platform guard on purpose: it's what makes this file testable on any
+// platform's SwiftPM (including Linux CI), not just inside Xcode.
 
 /// Fixed-capacity, oldest-first sample ring for scrolling telemetry traces.
 /// Value: struct, no shared mutable reference state.
@@ -18,6 +18,37 @@ public struct TelemetryRingBuffer: Sendable {
         values.append(value)
     }
 }
+
+/// Peak-hold-with-release auto-ranging for a scrolling scope channel
+/// (classic VU meter behavior): attacks instantly to a new peak, otherwise
+/// decays multiplicatively toward `minimumRange` every call. Framework-level
+/// (not view-private) because both the range math and the normalization it
+/// drives are pure and reusable — any TelemetryWaveformView/TelemetryScopeView
+/// caller needs this, so it shouldn't be reimplemented per app.
+public enum TelemetryAutoRange {
+    /// - Parameters:
+    ///   - current: the channel's current full-scale value.
+    ///   - newestSample: the most recent raw (unnormalized) sample.
+    ///   - minimumRange: floor so a near-zero signal doesn't collapse the
+    ///     trace to a razor-thin line.
+    ///   - releasePerTick: multiplicative decay applied once per call when
+    ///     no new peak is set; e.g. 0.94 releases to floor in ~2s at 30Hz.
+    public static func decayedRange(current: Double, newestSample: Float, minimumRange: Double, releasePerTick: Double = 0.94) -> Double {
+        let instantaneous = max(Double(abs(newestSample)) * 1.1, minimumRange)
+        if instantaneous > current { return instantaneous }
+        return max(minimumRange, current * releasePerTick)
+    }
+
+    /// Maps raw samples into -1...1 by dividing by `range`, clamped.
+    public static func normalized(_ values: [Float], by range: Double) -> [Float] {
+        guard range > 0 else { return values }
+        return values.map { Float(min(max(Double($0) / range, -1), 1)) }
+    }
+}
+
+#if canImport(MetalKit) && canImport(SwiftUI)
+import MetalKit
+import SwiftUI
 
 private let telemetryShaderSource = """
 #include <metal_stdlib>

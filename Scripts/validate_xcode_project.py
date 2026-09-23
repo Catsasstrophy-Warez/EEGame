@@ -47,10 +47,17 @@ required_yaml = [
     "SUPPORTS_MACCATALYST: YES",
     "TARGETED_DEVICE_FAMILY: \"1,2\"",
     "GENERATE_INFOPLIST_FILE: YES",
+    "ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon",
 ]
 for token in required_yaml:
     if token not in y:
         errors.append(f"project.yml missing required setting: {token}")
+
+app_icon_set = ROOT / "Sources" / "ElectricEngineerApp" / "Assets.xcassets" / "AppIcon.appiconset"
+if not (app_icon_set / "Contents.json").exists():
+    errors.append("missing Sources/ElectricEngineerApp/Assets.xcassets/AppIcon.appiconset/Contents.json")
+if not any(app_icon_set.glob("*.png")):
+    errors.append("AppIcon.appiconset has no PNG image")
 
 
 # Rev74: require all runtime frameworks to be direct embedded app dependencies in project.yml.
@@ -105,6 +112,7 @@ print("PASS unique production bundle identifiers")
 print("PASS iPhone+iPad target intent")
 print("PASS Mac Catalyst target intent")
 print("PASS generated Info.plist intent")
+print("PASS app icon asset catalog wired and present")
 print("PASS direct app embedding intent for all four runtime frameworks")
 print("PASS bundled PBX Embed Frameworks entries")
 print("PASS Rev75 semantic app root and production accessibility contract")

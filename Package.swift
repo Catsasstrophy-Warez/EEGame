@@ -19,6 +19,6 @@ let package = Package(
         .target(name: "RealityScene"),
         .target(name: "MetalTelemetry"),
         .target(name: "GameUI", dependencies: ["ScenarioEngine", "RealityScene", "MetalTelemetry"]),
-        .testTarget(name: "ElectricalCoreTests", dependencies: ["ElectricalCore", "CircuitMNA", "ScenarioEngine"])
+        .testTarget(name: "ElectricalCoreTests", dependencies: ["ElectricalCore", "CircuitMNA", "ScenarioEngine", "MetalTelemetry"])
     ]
 )

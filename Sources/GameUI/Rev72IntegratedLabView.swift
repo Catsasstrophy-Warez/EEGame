@@ -89,21 +89,17 @@ public struct Rev72IntegratedLabView: View {
         .background(.black.opacity(0.38))
     }
 
-    /// Peak-hold-with-release envelope (classic VU meter behavior): attacks
-    /// instantly to a new peak, otherwise decays multiplicatively toward
-    /// `minimumRange` every tick. Unlike scanning the whole ring buffer for
-    /// its max, this actually forgets a one-off spike within a couple of
-    /// seconds instead of holding the range until the spike physically
-    /// scrolls out of the buffer.
+    /// Thin wrappers around MetalTelemetry.TelemetryAutoRange, which owns
+    /// the actual peak-hold/release + normalization logic (pure, unit
+    /// tested, framework-level — see MetalTelemetry.swift). Kept here only
+    /// to thread scopeRangeReleasePerTick through as the app's chosen decay
+    /// rate without every call site repeating it.
     private func decayedRange(current: Double, newestSample: Float, minimumRange: Double) -> Double {
-        let instantaneous = max(Double(abs(newestSample)) * 1.1, minimumRange)
-        if instantaneous > current { return instantaneous }
-        return max(minimumRange, current * scopeRangeReleasePerTick)
+        TelemetryAutoRange.decayedRange(current: current, newestSample: newestSample, minimumRange: minimumRange, releasePerTick: scopeRangeReleasePerTick)
     }
 
     private func normalized(_ values: [Float], by range: Double) -> [Float] {
-        guard range > 0 else { return values }
-        return values.map { Float(min(max(Double($0) / range, -1), 1)) }
+        TelemetryAutoRange.normalized(values, by: range)
     }
 
     private var scopeTimebaseLabel: String {
