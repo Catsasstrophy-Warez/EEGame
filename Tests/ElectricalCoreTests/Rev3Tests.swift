@@ -605,18 +605,20 @@ import ScenarioEngine
  @Test func breadboardRowsShareNode(){let b=EEBreadboard53();#expect(b.node(row:5,column:0)==b.node(row:5,column:4));#expect(b.node(row:5,column:0) != b.node(row:5,column:6))}
  @Test func embeddedRuntimeSteps(){var e=EEEmbeddedRuntime53();let p:[EEEmbeddedInstruction53]=[.set("OUT",1),.add("OUT",2)];e.step(p);e.step(p);#expect(e.registers["OUT"]==3);#expect(e.halted)}
  // EERev53SimulationProduction's synthesized Codable is 7 .base-wrapped
- // revisions deep, bottoming out in two large simulation subsystems.
- // Encoding/decoding it at -Onone on Swift Testing's concurrency-executor
- // thread (smaller default stack than the main thread) overflows the
- // stack on real Apple platforms (confirmed via CI: a Bus error at
- // ___chkstk_darwin, i.e. a genuine stack overflow, not a Foundation
- // behavior difference — Linux's swift-corelibs-Foundation JSONEncoder
- // apparently uses less stack per level and never hit this). Running the
- // actual encode/decode on a thread with an explicit larger stack avoids
- // it without touching the production Codable conformances.
+ // revisions deep, bottoming out in two large simulation subsystems, which
+ // makes it an enormous value type (everything is stored inline, no
+ // indirection). The first fix attempt only moved the JSON encode/decode
+ // to a bigger-stack thread and still crashed identically — the real CI
+ // crash backtrace shows the overflow happens in the test's own macro-
+ // generated entry closure, before that thread is even spawned: just
+ // constructing `var r = EERev53SimulationProduction()` as a local on the
+ // Swift Testing concurrency-executor's small default stack is enough to
+ // overflow it (Bus error at ___chkstk_darwin — a real stack overflow, not
+ // a thrown error; Linux's swift-corelibs-Foundation never reproduced this
+ // because the crash isn't in Foundation at all). Fix: construct the
+ // struct, mutate it, and encode/decode it all inside the big-stack
+ // thread, so nothing of this size ever touches the fragile stack.
  @Test func rev53RoundTrips() throws {
-  var r=EERev53SimulationProduction();r.generator.frequencyHz=1234;r.relay.coilVolts=24
-  let toEncode=r
   let semaphore=DispatchSemaphore(value:0)
   // Safe despite the compiler's ordinary Sendable checking not being able to
   // see it: semaphore.wait() below only returns after signal() below has
@@ -626,12 +628,13 @@ import ScenarioEngine
   nonisolated(unsafe) var thrown:Error?
   let thread=Thread{
    do{
-    let d=try JSONEncoder().encode(toEncode)
+    var r=EERev53SimulationProduction();r.generator.frequencyHz=1234;r.relay.coilVolts=24
+    let d=try JSONEncoder().encode(r)
     decodedFrequency=try JSONDecoder().decode(EERev53SimulationProduction.self,from:d).generator.frequencyHz
    }catch{thrown=error}
    semaphore.signal()
   }
-  thread.stackSize=8*1024*1024
+  thread.stackSize=16*1024*1024
   thread.start()
   semaphore.wait()
   if let thrown{throw thrown}
