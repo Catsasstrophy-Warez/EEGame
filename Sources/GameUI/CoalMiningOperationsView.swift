@@ -36,6 +36,53 @@ struct EECoalMiningDashboard: View {
     }
 }
 
+/// Consults Vera with a context auto-built from this mine's live
+/// atmospheric sensor state (`EEVeraMentorContextFactory.coalMining`) rather
+/// than requiring the player to re-describe what the sensors already show.
+/// Identity/area/gas-test/energy-isolation remain the player's explicit
+/// confirmations — only the safety-affected and evidence fields are
+/// auto-populated from the real simulation.
+@available(iOS 18.0, macOS 15.0, *)
+struct EECoalMiningVeraConsultButton: View {
+    let mine: EEMineID
+    let state: EECoalMiningRev44
+    @State private var identityConfirmed = false
+    @State private var areaClassificationKnown = false
+    @State private var gasTestCurrent = false
+    @State private var energyIsolatedAndVerified = false
+    @State private var reply: EEVeraMentorReply?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Toggle("Identity confirmed", isOn: $identityConfirmed).accessibilityIdentifier("coalMining.vera.identityConfirmed")
+            Toggle("Area classification known", isOn: $areaClassificationKnown).accessibilityIdentifier("coalMining.vera.areaClassificationKnown")
+            Toggle("Gas test current", isOn: $gasTestCurrent).accessibilityIdentifier("coalMining.vera.gasTestCurrent")
+            Toggle("Energy isolated and verified", isOn: $energyIsolatedAndVerified).accessibilityIdentifier("coalMining.vera.energyIsolated")
+            Button("CONSULT VERA ON THIS MINE") {
+                let context = EEVeraMentorContextFactory.coalMining(
+                    mine: mine, state: state, equipmentID: mine.rawValue,
+                    symptom: "Live atmospheric/longwall check for \(mine.rawValue)",
+                    identityConfirmed: identityConfirmed,
+                    areaClassificationKnown: areaClassificationKnown,
+                    gasTestCurrent: gasTestCurrent,
+                    energyIsolatedAndVerified: energyIsolatedAndVerified
+                )
+                Task { reply = await EEVeraMentorRuntime.replyWithAudit(for: context) }
+            }.buttonStyle(.borderedProminent).accessibilityIdentifier("coalMining.vera.consult")
+
+            if let reply {
+                EEStatusLamp75(
+                    label: reply.safety.status == .stopAndEscalate ? "STOP" : "PROCEED",
+                    active: true,
+                    tint: reply.safety.status == .stopAndEscalate ? EEIndustrialPalette.danger : EEIndustrialPalette.healthy
+                ).accessibilityIdentifier("coalMining.vera.safetyLamp")
+                Text(reply.safety.title).font(.subheadline.bold())
+                Text(reply.safety.message).font(.caption).foregroundStyle(.secondary)
+            }
+        }.accessibilityIdentifier("coalMining.veraConsult")
+    }
+}
+
 @available(iOS 18.0, macOS 15.0, *)
 struct EECoalLongwallFaceView: View {
     let mine: EEMineID

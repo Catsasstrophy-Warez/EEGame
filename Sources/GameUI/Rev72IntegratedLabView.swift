@@ -314,6 +314,7 @@ public struct Rev72IntegratedLabView: View {
                     EECoalPreparationPlantView(state:coalMining)
                     EECoalTrainLoadoutView(state:coalMining)
                     EECoalIncidentReplayView(state:coalMining,cursor:$coalIncidentCursor)
+                    EECoalMiningVeraConsultButton(mine:selectedMine,state:coalMining)
                 }.accessibilityIdentifier("field.coalMining")
                 EEInstrumentPanel75("Facility Twin",subtitle:"STATION → ROOM → MCC → CABINET → TERMINAL → FIELD DEVICE") {
                     EEFacilityNavigator80(selectedIdentity:$selectedIdentity,objects:EEFacilityTwin80.objects)

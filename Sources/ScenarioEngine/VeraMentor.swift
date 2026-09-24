@@ -18,6 +18,7 @@ public enum EEVeraMentorDomain: String, CaseIterable, Codable, Sendable, Identif
     case instrumentation
     case naturalGas
     case coalMining
+    case rotatingEquipment
     case processSafety
 
     public var id: String { rawValue }
@@ -27,6 +28,7 @@ public enum EEVeraMentorDomain: String, CaseIterable, Codable, Sendable, Identif
         case .instrumentation: "Instrumentation & controls"
         case .naturalGas: "Natural gas process"
         case .coalMining: "Coal mining & prep plant"
+        case .rotatingEquipment: "Rotating equipment"
         case .processSafety: "Process safety"
         }
     }
@@ -57,6 +59,10 @@ public enum EEVeraMentorDomainKnowledge {
             EEVeraMentorPathway(domain: domain,
                 independentEvidence: ["Confirm methane% and CO ppm at the affected ventilation branch before anything else", "Compare shearer/AFC/shield telemetry against the last known-good baseline", "Check the incident recorder for the earliest abnormal frame, not the loudest one"],
                 escalationTriggers: ["Methane reads above the alarm threshold at any monitored sensor", "A hydraulic shield, AFC, or belt protective interlock is affected", "Ventilation fan pressure or airflow has dropped below the approved minimum"])
+        case .rotatingEquipment:
+            EEVeraMentorPathway(domain: domain,
+                independentEvidence: ["Confirm process conditions and local mechanical indicators before touching a probe or coupling", "Compare redundant vibration/speed/temperature channels, not one", "Check lube oil, seal gas, cooling, instrument air, and driver permissives", "Preserve trip logs and pre-trip trends before any reset"],
+                escalationTriggers: ["Protection is active or a restart could damage equipment", "A guard, coupling, or pressure boundary would be disturbed", "The cause-and-effect or trip-reset authority is unclear"])
         case .processSafety:
             EEVeraMentorPathway(domain: domain,
                 independentEvidence: ["Review current cause-and-effect, proof-test, bypass, and impairment records", "Confirm alarm, trip, final element, and feedback independently", "Record the exact device identity, state, time, and permissive/interlock context"],
