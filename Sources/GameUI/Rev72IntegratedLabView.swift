@@ -42,6 +42,9 @@ public struct Rev72IntegratedLabView: View {
     @State private var commissioning83 = EECommissioningState83()
     @State private var facility88 = EEFacilityPowerState88()
     @State private var facilityFault88: EEFaultKind88 = .none
+    @State private var coalMining = EECoalMiningRev44()
+    @State private var selectedMine: EEMineID = .northRidge
+    @State private var coalIncidentCursor = 0
 
     public init() {}
 
@@ -295,6 +298,20 @@ public struct Rev72IntegratedLabView: View {
                     EERev88CausalRibbon(frame:facility88.frame)
                     EERev88ThermalStrip(frame:facility88.frame)
                 }.accessibilityIdentifier("field.rev88FacilityPower")
+                EEInstrumentPanel75("Coal Mining Operations",subtitle:"LONGWALL • VENTILATION • PREP PLANT • TRAIN LOADOUT • ONE PHYSICAL TRUTH") {
+                    Picker("Mine",selection:$selectedMine) {
+                        ForEach(EEMineID.allCases,id:\.self) { Text($0.rawValue).tag($0) }
+                    }.pickerStyle(.segmented).accessibilityIdentifier("coalMining.minePicker")
+                    Button("ADVANCE COAL MINING") {
+                        coalMining.tick(seconds:30)
+                    }.buttonStyle(.borderedProminent).accessibilityIdentifier("coalMining.advance")
+                    EECoalMiningDashboard(state:coalMining)
+                    EECoalLongwallFaceView(mine:selectedMine,state:coalMining)
+                    EECoalVentilationAtmosphereView(mine:selectedMine,state:coalMining)
+                    EECoalPreparationPlantView(state:coalMining)
+                    EECoalTrainLoadoutView(state:coalMining)
+                    EECoalIncidentReplayView(state:coalMining,cursor:$coalIncidentCursor)
+                }.accessibilityIdentifier("field.coalMining")
                 EEInstrumentPanel75("Facility Twin",subtitle:"STATION → ROOM → MCC → CABINET → TERMINAL → FIELD DEVICE") {
                     EEFacilityNavigator80(selectedIdentity:$selectedIdentity,objects:EEFacilityTwin80.objects)
                 }.accessibilityIdentifier("field.facilityTwin")

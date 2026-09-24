@@ -19,6 +19,7 @@ run_py Scripts/validate_continuous_causal_machine85.py
 run_py Scripts/validate_unified_truth.py
 run_py Scripts/validate_reality_scene.py
 run_py Scripts/validate_metal_telemetry.py
+run_py Scripts/validate_coal_mining.py
 run_py Scripts/validate_xcode_project.py
 
 echo "== Swift build: ScenarioEngine =="

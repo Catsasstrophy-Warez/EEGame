@@ -31,6 +31,7 @@ jobs:
                    Scripts/validate_unified_truth.py \
                    Scripts/validate_reality_scene.py \
                    Scripts/validate_metal_telemetry.py \
+                   Scripts/validate_coal_mining.py \
                    Scripts/validate_causal_interaction93.py \
                    Scripts/validate_facility_power88.py \
                    Scripts/validate_immersive_twin.py \

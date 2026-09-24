@@ -11,6 +11,7 @@ The current registry is implemented in `Sources/GameUI/Navigation/FeatureReachab
 | Golden Thread | Engineering | integrated | `engineering.goldenThread` |
 | Universal Focus Object | Field | integrated | `field.focusObject` |
 | Electrical Vision | Field | production | `field.electricalVision` |
+| Coal Mining Operations | Field | integrated | `field.coalMining` |
 
 Rev78–84 visual-system files remain implemented strata. They are not automatically promoted to production-certified reachability merely because the source exists. Xcode/XCUI verification should audit every button and navigation path before release certification.
 
