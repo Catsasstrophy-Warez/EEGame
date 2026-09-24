@@ -72,6 +72,9 @@ struct EEVeraMentorPanel: View {
             Toggle("Retain audit log", isOn: $configuration.retainAuditLog).accessibilityIdentifier("vera.retainAuditLog")
                 .onChange(of: configuration) { _, newValue in EEVeraMentorStore.saveConfiguration(newValue) }
 
+            Text("Spec \(EEVeraMentorSpecification.version) · assumed \(EEVeraMentorSpecification.assumedCodeEdition) · no on-device or connected model is installed — every reply above came from the deterministic offline mentor.")
+                .font(.system(size: 9)).foregroundStyle(.secondary).accessibilityIdentifier("vera.specVersion")
+
             Button(showAudit ? "HIDE AUDIT LOG" : "SHOW AUDIT LOG") { showAudit.toggle() }
                 .buttonStyle(.bordered).accessibilityIdentifier("vera.showAudit")
             if showAudit {

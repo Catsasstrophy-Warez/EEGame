@@ -7,6 +7,7 @@ refindex=(r/"Sources/ScenarioEngine/VeraMentorReferenceIndex.swift").read_text()
 codeknowledge=(r/"Sources/ScenarioEngine/VeraCodeKnowledge.swift").read_text()
 safetyknowledge=(r/"Sources/ScenarioEngine/VeraElectricalSafetyKnowledge.swift").read_text()
 navigator=(r/"Sources/ScenarioEngine/VeraStandardsNavigator.swift").read_text()
+spec=(r/"Sources/ScenarioEngine/VeraMentorSpecification.swift").read_text()
 ui=(r/"Sources/GameUI/VeraMentorView.swift").read_text()
 coalui=(r/"Sources/GameUI/CoalMiningOperationsView.swift").read_text()
 gameui=(r/"Sources/GameUI/Rev72IntegratedLabView.swift").read_text()
@@ -73,6 +74,16 @@ checks={
 "reply always carries controllingAuthorities and standardsRoute":"controllingAuthorities: [EEVeraCodeReference]" in engine and "standardsRoute: EEVeraStandardsRoute" in engine,
 "UI surfaces controlling authorities and standards routing":"vera.controllingAuthorities" in ui and "vera.standardsRoute" in ui,
 "tests cover the second-generation port":"everyReferenceHasAWellFormedHTTPSURL" in tests and "plcQuestionRoutesToControlSystemHazardWithOnlineEditStop" in tests and "controlsFamilyCoversOnlineEditDiscipline" in tests,
+# Persona system prompt: staged for a future LLM-backed provider, inert
+# for the current offline deterministic one. Regression-guard the hard
+# safety/tone boundaries so a future prompt edit can't silently drop them.
+"specification file exists with version and system prompt":"public static let version" in spec and "public static let systemPrompt" in spec,
+"system prompt declares the never-flirtatious hard boundary":"No flirtation, innuendo, romantic framing" in spec,
+"system prompt declares safety is never softened for tone":"safety confirmations are never cut for tone or brevity" in spec,
+"persona safety invariants are separately testable, not just prose":"public static let personaSafetyInvariants: [String]" in spec,
+"envelope helper exists for a future provider's request context":"public static func envelope(for context: EEVeraMentorContext)" in spec and "struct RequestEnvelope" in spec,
+"UI discloses spec version and that no model is actually installed":"vera.specVersion" in ui and "no on-device or connected model is installed" in ui,
+"tests cover spec invariants, EOR/AHJ boundary, and envelope round-trip":"systemPromptContainsEveryPersonaSafetyInvariantVerbatim" in tests and "envelopeRoundTripsThroughJSON" in tests,
 }
 for k,v in checks.items(): print(("PASS" if v else "FAIL"),k)
 raise SystemExit(0 if all(checks.values()) else 1)

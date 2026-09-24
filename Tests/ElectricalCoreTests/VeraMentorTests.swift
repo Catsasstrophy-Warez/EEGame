@@ -461,3 +461,59 @@ import Foundation
         #expect(reply.standardsRoute.hazards.contains(.arcFlash))
     }
 }
+
+@Suite("Vera mentor specification (future-provider system prompt)") struct VeraMentorSpecificationTests {
+    @Test func versionAndCodeEditionAreSet() {
+        #expect(!EEVeraMentorSpecification.version.isEmpty)
+        #expect(EEVeraMentorSpecification.assumedCodeEdition == "NFPA 70-2023")
+    }
+
+    @Test func systemPromptContainsEveryPersonaSafetyInvariantVerbatim() {
+        for invariant in EEVeraMentorSpecification.personaSafetyInvariants {
+            #expect(EEVeraMentorSpecification.systemPrompt.contains(invariant), "system prompt is missing: \(invariant)")
+        }
+    }
+
+    @Test func systemPromptEstablishesTheEORAHJBoundary() {
+        #expect(EEVeraMentorSpecification.systemPrompt.contains("engineer of record"))
+        #expect(EEVeraMentorSpecification.systemPrompt.contains("EOR/AHJ"))
+    }
+
+    @Test func systemPromptNamesTheGameRelevantDomains() {
+        let prompt = EEVeraMentorSpecification.systemPrompt
+        #expect(prompt.contains("Hazardous Location"))
+        #expect(prompt.contains("Class I"))
+        #expect(prompt.contains("NFPA 70E"))
+    }
+
+    @Test func envelopeMapsContextFieldsExactly() {
+        var c = EEVeraMentorContext(domain: .naturalGas, symptom: "gas detector alarm", equipmentID: "GD-12")
+        c.identityConfirmed = true
+        c.areaClassificationKnown = true
+        c.gasTestCurrent = true
+        c.energyIsolatedAndVerified = false
+        c.safetyFunctionAffected = true
+        c.evidenceCount = 3
+        c.firstDivergence = "detector vs. field sample"
+        let envelope = EEVeraMentorSpecification.envelope(for: c)
+        #expect(envelope.specificationVersion == EEVeraMentorSpecification.version)
+        #expect(envelope.codeEdition == EEVeraMentorSpecification.assumedCodeEdition)
+        #expect(envelope.domain == "naturalGas")
+        #expect(envelope.symptom == "gas detector alarm")
+        #expect(envelope.equipmentID == "GD-12")
+        #expect(envelope.identityConfirmed == true)
+        #expect(envelope.areaClassificationKnown == true)
+        #expect(envelope.gasTestCurrent == true)
+        #expect(envelope.energyIsolatedAndVerified == false)
+        #expect(envelope.safetyFunctionAffected == true)
+        #expect(envelope.evidenceCount == 3)
+        #expect(envelope.firstDivergence == "detector vs. field sample")
+    }
+
+    @Test func envelopeRoundTripsThroughJSON() throws {
+        let envelope = EEVeraMentorSpecification.envelope(for: EEVeraMentorContext(domain: .electrical))
+        let data = try JSONEncoder().encode(envelope)
+        let decoded = try JSONDecoder().decode(EEVeraMentorSpecification.RequestEnvelope.self, from: data)
+        #expect(decoded == envelope)
+    }
+}
