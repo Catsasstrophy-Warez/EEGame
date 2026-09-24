@@ -3,6 +3,7 @@ from pathlib import Path
 r=Path(__file__).resolve().parents[1]
 engine=(r/"Sources/ScenarioEngine/VeraMentor.swift").read_text()
 capabilities=(r/"Sources/ScenarioEngine/VeraMentorCapabilities.swift").read_text()
+refindex=(r/"Sources/ScenarioEngine/VeraMentorReferenceIndex.swift").read_text()
 ui=(r/"Sources/GameUI/VeraMentorView.swift").read_text()
 coalui=(r/"Sources/GameUI/CoalMiningOperationsView.swift").read_text()
 gameui=(r/"Sources/GameUI/Rev72IntegratedLabView.swift").read_text()
@@ -33,6 +34,15 @@ checks={
 "coal mining view can auto-consult vera from live state":"struct EECoalMiningVeraConsultButton" in coalui and "EEVeraMentorContextFactory.coalMining(" in coalui,
 "coal mining vera consult wired into Field workspace":"EECoalMiningVeraConsultButton(mine:selectedMine,state:coalMining)" in gameui,
 "tests cover audit persistence and live-state escalation":"replyWithAuditPersistsAnEventWhenRetentionIsOn" in tests and "coalMiningContextEscalatesOnRealMethaneAlarm" in tests and "facilityPowerContextEscalatesOnRealTripCause" in tests,
+# Reference index (NEC/NFPA 70E/field quick-reference): structured
+# citations only, never verbatim code/book text, and every entry must
+# tell the player to verify against their AHJ-adopted edition.
+"reference index covers NEC, NFPA 70E, and field quick-reference":all(s in refindex for s in ['case nec = "NEC (NFPA 70)"','case nfpa70E = "NFPA 70E"','case fieldReferenceGuide = "Field quick-reference"']),
+"reference index disclaims verbatim quoting and demands edition verification":"AHJ-adopted edition" in refindex and "not a copy of any of those publications" in refindex,
+"reference retrieval is domain-scoped":"static func retrieve(domain: EEVeraMentorDomain" in refindex and "entry.domains.contains(domain)" in refindex,
+"runtime attaches citations after the provider, never before the gate":"let citations = EEVeraReferenceIndex.retrieve" in engine and engine.index("EEVeraSafetyRouter.gate(context)") < engine.index("let citations = EEVeraReferenceIndex.retrieve"),
+"reply view surfaces citations with edition-verification disclosure":"vera.citations" in ui and "VERIFY AGAINST YOUR AHJ-ADOPTED EDITION" in ui,
+"tests cover citation retrieval and gate-then-cite ordering":"everyEntryDeclaresAtLeastOneDomainAndKeyword" in tests and "stopVerdictStillReceivesCitations" in tests,
 }
 for k,v in checks.items(): print(("PASS" if v else "FAIL"),k)
 raise SystemExit(0 if all(checks.values()) else 1)

@@ -196,3 +196,61 @@ import Foundation
         #expect(response.status == .confirmedSafe)
     }
 }
+
+@Suite("Vera mentor reference index") struct VeraMentorReferenceIndexTests {
+    @Test func everyEntryDeclaresAtLeastOneDomainAndKeyword() {
+        for entry in EEVeraReferenceIndex.entries {
+            #expect(!entry.domains.isEmpty, "\(entry.id) has no domain")
+            #expect(!entry.keywords.isEmpty, "\(entry.id) has no keywords")
+            #expect(!entry.citation.isEmpty, "\(entry.id) has no citation label")
+        }
+    }
+
+    @Test func entryIDsAreUnique() {
+        let ids = EEVeraReferenceIndex.entries.map(\.id)
+        #expect(Set(ids).count == ids.count)
+    }
+
+    @Test func retrievalIsScopedToTheRequestedDomain() {
+        let results = EEVeraReferenceIndex.retrieve(domain: .naturalGas, query: "ground fault gfci receptacle")
+        for r in results { #expect(r.domains.contains(.naturalGas)) }
+    }
+
+    @Test func groundFaultQueryFindsTheGFCICitation() {
+        let results = EEVeraReferenceIndex.retrieve(domain: .electrical, query: "GFCI nuisance trip on a receptacle")
+        #expect(results.contains { $0.id == "nec-210.8" })
+    }
+
+    @Test func arcFlashQueryFindsNFPA70ECitation() {
+        let results = EEVeraReferenceIndex.retrieve(domain: .electrical, query: "arc flash PPE category boundary")
+        #expect(results.contains { $0.id == "nfpa70e-130" })
+    }
+
+    @Test func classifiedAreaQueryFindsHazardousLocationCitation() {
+        let results = EEVeraReferenceIndex.retrieve(domain: .naturalGas, query: "classified area hazardous location")
+        #expect(results.contains { $0.id == "nec-500" })
+    }
+
+    @Test func noKeywordMatchStillReturnsDomainScopedFallback() {
+        let results = EEVeraReferenceIndex.retrieve(domain: .rotatingEquipment, query: "zzz-nonsense-query-zzz")
+        #expect(!results.isEmpty)
+        for r in results { #expect(r.domains.contains(.rotatingEquipment)) }
+    }
+
+    @Test func replyAttachesDomainScopedCitations() async {
+        var c = EEVeraMentorContext(domain: .electrical, symptom: "GFCI keeps tripping on a receptacle circuit")
+        c.identityConfirmed = true
+        c.energyIsolatedAndVerified = true
+        let reply = await EEVeraMentorRuntime.reply(for: c)
+        #expect(!reply.citations.isEmpty)
+        for citation in reply.citations { #expect(citation.domains.contains(.electrical)) }
+    }
+
+    @Test func stopVerdictStillReceivesCitations() async {
+        var c = EEVeraMentorContext(domain: .naturalGas, symptom: "gas detector alarm near the compressor")
+        c.identityConfirmed = true
+        let reply = await EEVeraMentorRuntime.reply(for: c)
+        #expect(reply.safety.status == .stopAndEscalate)
+        #expect(!reply.citations.isEmpty)
+    }
+}

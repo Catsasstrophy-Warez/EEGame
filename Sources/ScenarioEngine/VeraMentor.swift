@@ -164,6 +164,11 @@ public struct EEVeraMentorReply: Sendable {
     public let mode: EEVeraMentorMode
     public let safety: EEVeraMentorDiagnosticResponse
     public let explanation: String
+    public let citations: [EEVeraCitation]
+
+    public init(mode: EEVeraMentorMode, safety: EEVeraMentorDiagnosticResponse, explanation: String, citations: [EEVeraCitation] = []) {
+        self.mode = mode; self.safety = safety; self.explanation = explanation; self.citations = citations
+    }
 }
 
 /// Implementations receive the already-gated context/response and may enrich
@@ -205,6 +210,13 @@ public enum EEVeraMentorRuntime {
     public static func reply(for context: EEVeraMentorContext, provider: EEVeraMentorProvider? = nil) async -> EEVeraMentorReply {
         let safety = EEVeraSafetyRouter.gate(context)
         let selectedProvider = provider ?? offline
-        return await selectedProvider.reply(for: context, safety: safety)
+        let base = await selectedProvider.reply(for: context, safety: safety)
+        // Citations are attached here, after the provider runs, from the
+        // bundled reference index — never invented by a provider. A stop
+        // verdict still gets citations (the player needs to know where the
+        // isolation/permit/area-classification requirement comes from too).
+        let query = [context.symptom, context.firstDivergence ?? "", safety.title].joined(separator: " ")
+        let citations = EEVeraReferenceIndex.retrieve(domain: context.domain, query: query)
+        return EEVeraMentorReply(mode: base.mode, safety: base.safety, explanation: base.explanation, citations: citations)
     }
 }

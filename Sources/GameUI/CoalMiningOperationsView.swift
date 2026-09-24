@@ -78,6 +78,9 @@ struct EECoalMiningVeraConsultButton: View {
                 ).accessibilityIdentifier("coalMining.vera.safetyLamp")
                 Text(reply.safety.title).font(.subheadline.bold())
                 Text(reply.safety.message).font(.caption).foregroundStyle(.secondary)
+                ForEach(reply.citations) { citation in
+                    Text("\(citation.source.rawValue) \(citation.citation)").font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary)
+                }.accessibilityIdentifier("coalMining.vera.citations")
             }
         }.accessibilityIdentifier("coalMining.veraConsult")
     }

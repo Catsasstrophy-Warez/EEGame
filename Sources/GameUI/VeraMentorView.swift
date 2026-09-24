@@ -126,6 +126,17 @@ private struct EEVeraMentorReplyView: View {
             }
 
             Text(reply.explanation).font(.footnote).italic().padding(.top, 4)
+
+            if !reply.citations.isEmpty {
+                Divider()
+                Text("REFERENCE — VERIFY AGAINST YOUR AHJ-ADOPTED EDITION").font(.system(size: 9, weight: .semibold)).foregroundStyle(.secondary)
+                ForEach(reply.citations) { citation in
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("\(citation.source.rawValue) — \(citation.citation)").font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        Text(citation.summary).font(.caption2).foregroundStyle(.secondary)
+                    }
+                }.accessibilityIdentifier("vera.citations")
+            }
         }
         .accessibilityIdentifier("vera.reply")
     }
