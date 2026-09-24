@@ -20,6 +20,7 @@ public enum EEVeraMentorDomain: String, CaseIterable, Codable, Sendable, Identif
     case coalMining
     case rotatingEquipment
     case processSafety
+    case plcAutomation
 
     public var id: String { rawValue }
     public var title: String {
@@ -30,6 +31,7 @@ public enum EEVeraMentorDomain: String, CaseIterable, Codable, Sendable, Identif
         case .coalMining: "Coal mining & prep plant"
         case .rotatingEquipment: "Rotating equipment"
         case .processSafety: "Process safety"
+        case .plcAutomation: "PLC programming & automation"
         }
     }
 }
@@ -81,6 +83,12 @@ public enum EEVeraMentorDomainKnowledge {
                 independentEvidence: ["Review current cause-and-effect, proof-test, bypass, and impairment records", "Confirm alarm, trip, final element, and feedback independently", "Record the exact device identity, state, time, and permissive/interlock context"],
                 commonFalsePositives: ["A healthy final element with a failed feedback path", "A bypass or inhibited alarm hidden in a control-system view", "A reset interpreted as a repair"],
                 escalationTriggers: ["A safety function is unavailable, bypassed, or repeatedly failing", "A test could initiate a hazardous state", "The required impairment response or compensating measure is unknown"])
+        case .plcAutomation:
+            EEVeraMentorPathway(domain: domain,
+                firstQuestions: ["Which rung/input/output is actually in question — permissive, run request, or output?", "Is this a logic problem, an I/O wiring problem, or a physical-device problem presenting as a logic fault?", "What was the last authorized online edit, and does the running program match the approved revision?"],
+                independentEvidence: ["Read the actual input/rung-power/output states from a scan capture, not just the HMI summary", "Confirm the physical field state independently before trusting a logic bit", "Compare the running program against the approved, revision-controlled copy", "Check for an inhibited, forced, or overridden I/O point"],
+                commonFalsePositives: ["A forced or overridden I/O point mistaken for a real field condition", "An online edit that was never saved to the approved program copy", "A communication fault between rack/remote I/O read as a process fault"],
+                escalationTriggers: ["The task requires forcing, inhibiting, bypassing, or making an online edit to a live control or safety system", "The running program does not match the approved revision", "The change would affect a permissive, interlock, or safety-relevant rung"])
         }
     }
 }
@@ -179,9 +187,16 @@ public struct EEVeraMentorReply: Sendable {
     public let safety: EEVeraMentorDiagnosticResponse
     public let explanation: String
     public let citations: [EEVeraCitation]
+    public let controllingAuthorities: [EEVeraCodeReference]
+    public let standardsRoute: EEVeraStandardsRoute
 
-    public init(mode: EEVeraMentorMode, safety: EEVeraMentorDiagnosticResponse, explanation: String, citations: [EEVeraCitation] = []) {
-        self.mode = mode; self.safety = safety; self.explanation = explanation; self.citations = citations
+    public init(
+        mode: EEVeraMentorMode, safety: EEVeraMentorDiagnosticResponse, explanation: String,
+        citations: [EEVeraCitation] = [], controllingAuthorities: [EEVeraCodeReference] = [],
+        standardsRoute: EEVeraStandardsRoute = EEVeraStandardsRoute(hazards: [], authorities: [], verificationQuestions: [], safetyStopTriggers: [])
+    ) {
+        self.mode = mode; self.safety = safety; self.explanation = explanation
+        self.citations = citations; self.controllingAuthorities = controllingAuthorities; self.standardsRoute = standardsRoute
     }
 }
 
@@ -231,6 +246,15 @@ public enum EEVeraMentorRuntime {
         // isolation/permit/area-classification requirement comes from too).
         let query = [context.symptom, context.firstDivergence ?? "", safety.title].joined(separator: " ")
         let citations = EEVeraReferenceIndex.retrieve(domain: context.domain, query: query)
-        return EEVeraMentorReply(mode: base.mode, safety: base.safety, explanation: base.explanation, citations: citations)
+        // Controlling authorities and standards routing are independent of
+        // the citation index's keyword scoring: they always name who
+        // governs this domain/question, even when no specific citation
+        // matched the query.
+        let authorities = EEVeraCodeKnowledge.references(for: context.domain)
+        let route = EEVeraStandardsNavigator.route(question: context.symptom, domain: context.domain)
+        return EEVeraMentorReply(
+            mode: base.mode, safety: base.safety, explanation: base.explanation,
+            citations: citations, controllingAuthorities: authorities, standardsRoute: route
+        )
     }
 }

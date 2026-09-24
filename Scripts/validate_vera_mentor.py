@@ -4,6 +4,9 @@ r=Path(__file__).resolve().parents[1]
 engine=(r/"Sources/ScenarioEngine/VeraMentor.swift").read_text()
 capabilities=(r/"Sources/ScenarioEngine/VeraMentorCapabilities.swift").read_text()
 refindex=(r/"Sources/ScenarioEngine/VeraMentorReferenceIndex.swift").read_text()
+codeknowledge=(r/"Sources/ScenarioEngine/VeraCodeKnowledge.swift").read_text()
+safetyknowledge=(r/"Sources/ScenarioEngine/VeraElectricalSafetyKnowledge.swift").read_text()
+navigator=(r/"Sources/ScenarioEngine/VeraStandardsNavigator.swift").read_text()
 ui=(r/"Sources/GameUI/VeraMentorView.swift").read_text()
 coalui=(r/"Sources/GameUI/CoalMiningOperationsView.swift").read_text()
 gameui=(r/"Sources/GameUI/Rev72IntegratedLabView.swift").read_text()
@@ -59,6 +62,17 @@ checks={
 "UI surfaces first questions and false positives, not just next actions":"vera.firstQuestions" in ui and "vera.falsePositives" in ui,
 "tests cover pathway depth across every domain":"everyDomainHasFirstQuestionsAndFalsePositives" in tests,
 "tests cover OSHA/industry-standard retrieval":"lotoQueryFindsBothOSHAAndNFPA70ECitations" in tests and "safetyInstrumentedSystemQueryFindsIEC61511" in tests,
+# Second-generation port: plcAutomation domain, controlling-authority
+# index with real source URLs, checklist knowledge, and free-text
+# standards routing (from the updated upstream I&E Trainer handoff).
+"plcAutomation domain exists with a pathway":"case plcAutomation" in engine and "case .plcAutomation:" in engine,
+"code knowledge cites real https authorities, not copied text":"public let sourceURL: URL" in codeknowledge and 'authority: "NFPA 70E"' in codeknowledge,
+"uglys reference is scoped to hands-on domains only":"static func references(for domain: EEVeraMentorDomain)" in codeknowledge and ".naturalGas, .coalMining, .rotatingEquipment, .processSafety:" in codeknowledge,
+"safety checklist has verify/doNotInfer/escalateWhen per entry":"public let verify: [String]" in safetyknowledge and "public let doNotInfer: [String]" in safetyknowledge and "public let escalateWhen: [String]" in safetyknowledge,
+"standards navigator routes free text to hazards and authorities, not the gate":"static func route(question: String" in navigator and "enum EEVeraStandardsHazard" in navigator,
+"reply always carries controllingAuthorities and standardsRoute":"controllingAuthorities: [EEVeraCodeReference]" in engine and "standardsRoute: EEVeraStandardsRoute" in engine,
+"UI surfaces controlling authorities and standards routing":"vera.controllingAuthorities" in ui and "vera.standardsRoute" in ui,
+"tests cover the second-generation port":"everyReferenceHasAWellFormedHTTPSURL" in tests and "plcQuestionRoutesToControlSystemHazardWithOnlineEditStop" in tests and "controlsFamilyCoversOnlineEditDiscipline" in tests,
 }
 for k,v in checks.items(): print(("PASS" if v else "FAIL"),k)
 raise SystemExit(0 if all(checks.values()) else 1)

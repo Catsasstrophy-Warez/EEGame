@@ -335,4 +335,129 @@ import Foundation
         #expect(response.pathway.domain == .coalMining)
         #expect(response.pathway.commonFalsePositives.contains { $0.contains("methane ignition") || $0.contains("bearing heat") })
     }
+
+    @Test func plcAutomationDomainStopsOnUnconfirmedIdentityLikeEveryOtherDomain() {
+        var c = EEVeraMentorContext(domain: .plcAutomation)
+        c.energyIsolatedAndVerified = true
+        let response = EEVeraMentorDiagnosticEngine.response(for: c)
+        #expect(response.status == .stopAndEscalate)
+        #expect(response.pathway.domain == .plcAutomation)
+    }
+
+    @Test func plcAutomationDoesNotRequireTheGasGate() {
+        var c = EEVeraMentorContext(domain: .plcAutomation)
+        c.identityConfirmed = true
+        c.energyIsolatedAndVerified = true
+        let response = EEVeraMentorDiagnosticEngine.response(for: c)
+        #expect(response.status == .confirmedSafe)
+    }
+}
+
+@Suite("Vera mentor code knowledge (controlling authorities)") struct VeraCodeKnowledgeTests {
+    @Test func everyReferenceHasAWellFormedHTTPSURL() {
+        for ref in EEVeraCodeKnowledge.references {
+            #expect(ref.sourceURL.scheme == "https", "\(ref.id) has a non-https source URL")
+            #expect(!ref.authority.isEmpty)
+            #expect(!ref.fieldUse.isEmpty)
+        }
+    }
+
+    @Test func uglysFieldReferenceIsScopedToHandsOnDomains() {
+        let electrical = EEVeraCodeKnowledge.references(for: .electrical)
+        let coal = EEVeraCodeKnowledge.references(for: .coalMining)
+        #expect(electrical.contains { $0.id == "uglys-electrical-references-2023" })
+        #expect(!coal.contains { $0.id == "uglys-electrical-references-2023" })
+    }
+
+    @Test func plcAutomationGetsTheFullReferenceSet() {
+        let plc = EEVeraCodeKnowledge.references(for: .plcAutomation)
+        #expect(plc.count == EEVeraCodeKnowledge.references.count)
+    }
+
+    @Test func authorityBoundaryNamesEveryAuthority() {
+        let boundary = EEVeraCodeKnowledge.authorityBoundary
+        #expect(boundary.contains("OSHA"))
+        #expect(boundary.contains("NFPA 70E"))
+        #expect(boundary.contains("NEC"))
+    }
+}
+
+@Suite("Vera mentor electrical safety checklist knowledge") struct VeraElectricalSafetyKnowledgeTests {
+    @Test func everyEntryHasNonEmptyVerifyDoNotInferAndEscalateWhen() {
+        for entry in EEVeraElectricalSafetyKnowledge.entries {
+            #expect(!entry.verify.isEmpty, "\(entry.id) has no verify items")
+            #expect(!entry.doNotInfer.isEmpty, "\(entry.id) has no doNotInfer items")
+            #expect(!entry.escalateWhen.isEmpty, "\(entry.id) has no escalateWhen items")
+        }
+    }
+
+    @Test func entryIDsAreUnique() {
+        let ids = EEVeraElectricalSafetyKnowledge.entries.map(\.id)
+        #expect(Set(ids).count == ids.count)
+    }
+
+    @Test func familyFilterReturnsOnlyThatFamily() {
+        let nfpa = EEVeraElectricalSafetyKnowledge.entries(for: "NFPA 70E")
+        #expect(!nfpa.isEmpty)
+        for entry in nfpa { #expect(entry.family == "NFPA 70E") }
+    }
+
+    @Test func controlsFamilyCoversOnlineEditDiscipline() {
+        let controls = EEVeraElectricalSafetyKnowledge.entries(for: "Controls")
+        #expect(controls.contains { $0.id == "plc-online-edit" })
+    }
+}
+
+@Suite("Vera mentor standards navigator") struct VeraStandardsNavigatorTests {
+    @Test func arcFlashQuestionRoutesToArcFlashHazardWithNFPA70EAndOSHA() {
+        let route = EEVeraStandardsNavigator.route(question: "What's the arc flash boundary here?", domain: .electrical)
+        #expect(route.hazards.contains(.arcFlash))
+        #expect(route.authorities.contains { $0.contains("NFPA 70E") })
+        #expect(route.authorities.contains { $0.contains("OSHA") })
+    }
+
+    @Test func plcQuestionRoutesToControlSystemHazardWithOnlineEditStop() {
+        let route = EEVeraStandardsNavigator.route(question: "Can I force this rung to test the interlock?", domain: .plcAutomation)
+        #expect(route.hazards.contains(.controlSystem))
+        #expect(route.safetyStopTriggers.contains { $0.contains("force, inhibit, bypass") })
+    }
+
+    @Test func hazardousLocationQuestionRoutesWithAPIAuthority() {
+        let route = EEVeraStandardsNavigator.route(question: "Is this a Class I Division 1 area?", domain: .naturalGas)
+        #expect(route.hazards.contains(.hazardousLocation))
+        #expect(route.authorities.contains { $0.contains("API RP 500/505") })
+        #expect(route.safetyStopTriggers.contains { $0.contains("classification, gas test") })
+    }
+
+    @Test func emptyQuestionFallsBackToDomainDefaultHazards() {
+        let plcRoute = EEVeraStandardsNavigator.route(question: "", domain: .plcAutomation)
+        #expect(plcRoute.hazards == [.controlSystem])
+        let coalRoute = EEVeraStandardsNavigator.route(question: "", domain: .coalMining)
+        #expect(coalRoute.hazards.contains(.hazardousLocation))
+    }
+
+    @Test func everyRouteIncludesTheUniversalStopTriggers() {
+        let route = EEVeraStandardsNavigator.route(question: "generic question", domain: .electrical)
+        #expect(route.safetyStopTriggers.contains { $0.contains("remembered article number") })
+        #expect(!route.verificationQuestions.isEmpty)
+    }
+}
+
+@Suite("Vera mentor reply carries authorities and routing") struct VeraMentorReplyEnrichmentTests {
+    @Test func replyAlwaysCarriesControllingAuthoritiesForItsDomain() async {
+        var c = EEVeraMentorContext(domain: .plcAutomation, symptom: "rung reads unexpectedly")
+        c.identityConfirmed = true
+        c.energyIsolatedAndVerified = true
+        let reply = await EEVeraMentorRuntime.reply(for: c)
+        #expect(!reply.controllingAuthorities.isEmpty)
+        #expect(reply.controllingAuthorities.contains { $0.id == "nfpa-70-2023" })
+    }
+
+    @Test func replyAlwaysCarriesAStandardsRouteEvenOnStop() async {
+        var c = EEVeraMentorContext(domain: .electrical, symptom: "arc flash risk on this panel")
+        c.safetyFunctionAffected = true
+        let reply = await EEVeraMentorRuntime.reply(for: c)
+        #expect(reply.safety.status == .stopAndEscalate)
+        #expect(reply.standardsRoute.hazards.contains(.arcFlash))
+    }
 }

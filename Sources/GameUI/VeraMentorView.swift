@@ -158,6 +158,32 @@ private struct EEVeraMentorReplyView: View {
                     }
                 }.accessibilityIdentifier("vera.citations")
             }
+
+            if !reply.controllingAuthorities.isEmpty {
+                Divider()
+                Text("CONTROLLING AUTHORITIES").font(.system(size: 9, weight: .semibold)).foregroundStyle(.secondary)
+                ForEach(reply.controllingAuthorities) { authority in
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("\(authority.authority) \(authority.edition)").font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        Text(authority.fieldUse).font(.caption2).foregroundStyle(.secondary)
+                        Link(authority.sourceURL.absoluteString, destination: authority.sourceURL).font(.caption2)
+                    }
+                }.accessibilityIdentifier("vera.controllingAuthorities")
+            }
+
+            if !reply.standardsRoute.safetyStopTriggers.isEmpty {
+                DisclosureGroup("Standards routing") {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Hazard categories: \(reply.standardsRoute.hazards.map(\.rawValue).joined(separator: ", "))").font(.caption2)
+                        ForEach(reply.standardsRoute.verificationQuestions, id: \.self) { q in
+                            Text("? \(q)").font(.caption2).foregroundStyle(.secondary)
+                        }
+                        ForEach(reply.standardsRoute.safetyStopTriggers, id: \.self) { stop in
+                            Text("⛔ \(stop)").font(.caption2).foregroundStyle(EEIndustrialPalette.danger)
+                        }
+                    }
+                }.font(.caption).accessibilityIdentifier("vera.standardsRoute")
+            }
         }
         .accessibilityIdentifier("vera.reply")
     }
