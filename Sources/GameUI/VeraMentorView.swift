@@ -187,6 +187,22 @@ private struct EEVeraMentorReplyView: View {
                     }
                 }.font(.caption).accessibilityIdentifier("vera.standardsRoute")
             }
+
+            if !reply.equipmentExpertise.isEmpty {
+                DisclosureGroup("Equipment expertise") {
+                    ForEach(reply.equipmentExpertise) { family in
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(family.title).font(.caption.bold())
+                            ForEach(family.firstChecks, id: \.self) { check in
+                                Text("→ \(check)").font(.caption2).foregroundStyle(.secondary)
+                            }
+                            ForEach(family.commonFailureModes, id: \.self) { mode in
+                                Text("⚠ \(mode)").font(.caption2).foregroundStyle(.secondary)
+                            }
+                        }.padding(.bottom, 4)
+                    }
+                }.font(.caption).accessibilityIdentifier("vera.equipmentExpertise")
+            }
         }
         .accessibilityIdentifier("vera.reply")
     }

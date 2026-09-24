@@ -8,6 +8,7 @@ codeknowledge=(r/"Sources/ScenarioEngine/VeraCodeKnowledge.swift").read_text()
 safetyknowledge=(r/"Sources/ScenarioEngine/VeraElectricalSafetyKnowledge.swift").read_text()
 navigator=(r/"Sources/ScenarioEngine/VeraStandardsNavigator.swift").read_text()
 spec=(r/"Sources/ScenarioEngine/VeraMentorSpecification.swift").read_text()
+equipment=(r/"Sources/ScenarioEngine/VeraEquipmentExpertise.swift").read_text()
 ui=(r/"Sources/GameUI/VeraMentorView.swift").read_text()
 coalui=(r/"Sources/GameUI/CoalMiningOperationsView.swift").read_text()
 gameui=(r/"Sources/GameUI/Rev72IntegratedLabView.swift").read_text()
@@ -84,6 +85,15 @@ checks={
 "envelope helper exists for a future provider's request context":"public static func envelope(for context: EEVeraMentorContext)" in spec and "struct RequestEnvelope" in spec,
 "UI discloses spec version and that no model is actually installed":"vera.specVersion" in ui and "no on-device or connected model is installed" in ui,
 "tests cover spec invariants, EOR/AHJ boundary, and envelope round-trip":"systemPromptContainsEveryPersonaSafetyInvariantVerbatim" in tests and "envelopeRoundTripsThroughJSON" in tests,
+# Equipment expertise: the 10 requested gas-facility systems, each with
+# real diagnostic content and citations that must resolve against the
+# actual reference index (never an invented citation id).
+"all 10 requested equipment families are present":equipment.count('.init(id: "') >= 10,
+"equipment families cover ESD/blowdown, LEL detection, TEG, and safety PLCs":all(s in equipment for s in ['id: "esd-shutdown-blowdown"','id: "lel-toxic-gas-detection"','id: "teg-dehydration-skid"','id: "safety-plc-rtu-cause-effect"']),
+"equipment match() is keyword-scored and domain-agnostic":"static func match(query: String" in equipment,
+"reply always carries equipmentExpertise":"equipmentExpertise: [EEVeraEquipmentFamily]" in engine and "EEVeraEquipmentExpertise.match(query: query)" in engine,
+"UI surfaces equipment expertise in the reply":"vera.equipmentExpertise" in ui,
+"tests cover all 10 families, citation-id integrity, and query matching":"allTenRequestedFamiliesArePresentWithUniqueIDs" in tests and "everyCitationIDResolvesToARealReferenceIndexEntry" in tests and "tegQueryMatchesTheDehydrationSkidFamily" in tests,
 }
 for k,v in checks.items(): print(("PASS" if v else "FAIL"),k)
 raise SystemExit(0 if all(checks.values()) else 1)

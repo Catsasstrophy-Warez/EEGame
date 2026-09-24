@@ -517,3 +517,71 @@ import Foundation
         #expect(decoded == envelope)
     }
 }
+
+@Suite("Vera mentor equipment expertise") struct VeraEquipmentExpertiseTests {
+    @Test func allTenRequestedFamiliesArePresentWithUniqueIDs() {
+        let ids = EEVeraEquipmentExpertise.families.map(\.id)
+        #expect(ids.count == 10)
+        #expect(Set(ids).count == 10)
+    }
+
+    @Test func everyFamilyHasSubstantiveContentInEveryField() {
+        for family in EEVeraEquipmentExpertise.families {
+            #expect(!family.domains.isEmpty, "\(family.id) has no domains")
+            #expect(!family.firstChecks.isEmpty, "\(family.id) has no firstChecks")
+            #expect(!family.commonFailureModes.isEmpty, "\(family.id) has no commonFailureModes")
+            #expect(!family.keyParameters.isEmpty, "\(family.id) has no keyParameters")
+            #expect(!family.citationIDs.isEmpty, "\(family.id) has no citationIDs")
+            #expect(!family.keywords.isEmpty, "\(family.id) has no keywords")
+        }
+    }
+
+    @Test func everyCitationIDResolvesToARealReferenceIndexEntry() {
+        let realIDs = Set(EEVeraReferenceIndex.entries.map(\.id))
+        for family in EEVeraEquipmentExpertise.families {
+            for citationID in family.citationIDs {
+                #expect(realIDs.contains(citationID), "\(family.id) cites unknown reference id \(citationID)")
+            }
+        }
+    }
+
+    @Test func tegQueryMatchesTheDehydrationSkidFamily() {
+        let results = EEVeraEquipmentExpertise.match(query: "TEG reboiler temperature running high")
+        #expect(results.first?.id == "teg-dehydration-skid")
+    }
+
+    @Test func esdQueryMatchesShutdownBlowdownFamily() {
+        let results = EEVeraEquipmentExpertise.match(query: "ESD tripped, need to check blowdown valve")
+        #expect(results.contains { $0.id == "esd-shutdown-blowdown" })
+    }
+
+    @Test func lelQueryMatchesGasDetectionFamily() {
+        let results = EEVeraEquipmentExpertise.match(query: "LEL sensor in alarm, bump test overdue")
+        #expect(results.first?.id == "lel-toxic-gas-detection")
+    }
+
+    @Test func vfdQueryMatchesMCCFamily() {
+        let results = EEVeraEquipmentExpertise.match(query: "VFD fault code on the motor starter")
+        #expect(results.first?.id == "mcc-starters-vfd-control-power")
+    }
+
+    @Test func forcedIOQueryMatchesSafetyPLCFamily() {
+        let results = EEVeraEquipmentExpertise.match(query: "forced IO point on the safety PLC cause and effect")
+        #expect(results.first?.id == "safety-plc-rtu-cause-effect")
+    }
+
+    @Test func nonsenseQueryReturnsEmptyRatherThanRandomMatches() {
+        let results = EEVeraEquipmentExpertise.match(query: "zzz-nonsense-zzz")
+        #expect(results.isEmpty)
+    }
+
+    @Test func replyAttachesEquipmentExpertiseMatchingTheSymptom() async {
+        var c = EEVeraMentorContext(domain: .naturalGas, symptom: "TEG glycol circulation pump not moving glycol")
+        c.identityConfirmed = true
+        c.areaClassificationKnown = true
+        c.gasTestCurrent = true
+        c.energyIsolatedAndVerified = true
+        let reply = await EEVeraMentorRuntime.reply(for: c)
+        #expect(reply.equipmentExpertise.contains { $0.id == "teg-dehydration-skid" })
+    }
+}

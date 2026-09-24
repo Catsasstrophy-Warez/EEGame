@@ -189,14 +189,17 @@ public struct EEVeraMentorReply: Sendable {
     public let citations: [EEVeraCitation]
     public let controllingAuthorities: [EEVeraCodeReference]
     public let standardsRoute: EEVeraStandardsRoute
+    public let equipmentExpertise: [EEVeraEquipmentFamily]
 
     public init(
         mode: EEVeraMentorMode, safety: EEVeraMentorDiagnosticResponse, explanation: String,
         citations: [EEVeraCitation] = [], controllingAuthorities: [EEVeraCodeReference] = [],
-        standardsRoute: EEVeraStandardsRoute = EEVeraStandardsRoute(hazards: [], authorities: [], verificationQuestions: [], safetyStopTriggers: [])
+        standardsRoute: EEVeraStandardsRoute = EEVeraStandardsRoute(hazards: [], authorities: [], verificationQuestions: [], safetyStopTriggers: []),
+        equipmentExpertise: [EEVeraEquipmentFamily] = []
     ) {
         self.mode = mode; self.safety = safety; self.explanation = explanation
         self.citations = citations; self.controllingAuthorities = controllingAuthorities; self.standardsRoute = standardsRoute
+        self.equipmentExpertise = equipmentExpertise
     }
 }
 
@@ -252,9 +255,11 @@ public enum EEVeraMentorRuntime {
         // matched the query.
         let authorities = EEVeraCodeKnowledge.references(for: context.domain)
         let route = EEVeraStandardsNavigator.route(question: context.symptom, domain: context.domain)
+        let equipment = EEVeraEquipmentExpertise.match(query: query)
         return EEVeraMentorReply(
             mode: base.mode, safety: base.safety, explanation: base.explanation,
-            citations: citations, controllingAuthorities: authorities, standardsRoute: route
+            citations: citations, controllingAuthorities: authorities, standardsRoute: route,
+            equipmentExpertise: equipment
         )
     }
 }
