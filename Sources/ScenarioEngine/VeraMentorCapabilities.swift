@@ -23,6 +23,27 @@ public struct EEVeraMentorConfiguration: Codable, Sendable, Equatable {
     public init() {}
 }
 
+/// Resolves a configuration's provider policy to an actual provider
+/// instance. `allowOnDevice` only ever resolves to
+/// `EEVeraAppleFoundationModelProvider` on a build whose SDK has
+/// FoundationModels (see that file's header) AND where the on-device model
+/// is actually available at runtime — every other case, including
+/// `allowConnectedWithConsent` (no connected adapter is implemented at
+/// all), falls back to the safe deterministic offline provider. This
+/// mirrors the resolver shape from the original I&E Trainer port.
+public enum EEVeraMentorProviderResolver {
+    public static func provider(for configuration: EEVeraMentorConfiguration = EEVeraMentorStore.loadConfiguration()) -> any EEVeraMentorProvider {
+        #if canImport(FoundationModels)
+        if configuration.providerPolicy == .allowOnDevice,
+           #available(iOS 26.0, macOS 26.0, *),
+           EEVeraAppleFoundationModelProvider.isAvailable {
+            return EEVeraAppleFoundationModelProvider()
+        }
+        #endif
+        return EEVeraOfflineProvider()
+    }
+}
+
 public struct EEVeraAuditEvent: Codable, Sendable, Equatable, Identifiable {
     public let id: UUID
     public let timestamp: Date

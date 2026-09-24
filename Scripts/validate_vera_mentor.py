@@ -9,6 +9,8 @@ safetyknowledge=(r/"Sources/ScenarioEngine/VeraElectricalSafetyKnowledge.swift")
 navigator=(r/"Sources/ScenarioEngine/VeraStandardsNavigator.swift").read_text()
 spec=(r/"Sources/ScenarioEngine/VeraMentorSpecification.swift").read_text()
 equipment=(r/"Sources/ScenarioEngine/VeraEquipmentExpertise.swift").read_text()
+techniques=(r/"Sources/ScenarioEngine/VeraFieldTechniquesKnowledge.swift").read_text()
+foundationprovider=(r/"Sources/ScenarioEngine/VeraAppleFoundationModelProvider.swift").read_text()
 ui=(r/"Sources/GameUI/VeraMentorView.swift").read_text()
 coalui=(r/"Sources/GameUI/CoalMiningOperationsView.swift").read_text()
 gameui=(r/"Sources/GameUI/Rev72IntegratedLabView.swift").read_text()
@@ -94,6 +96,16 @@ checks={
 "reply always carries equipmentExpertise":"equipmentExpertise: [EEVeraEquipmentFamily]" in engine and "EEVeraEquipmentExpertise.match(query: query)" in engine,
 "UI surfaces equipment expertise in the reply":"vera.equipmentExpertise" in ui,
 "tests cover all 10 families, citation-id integrity, and query matching":"allTenRequestedFamiliesArePresentWithUniqueIDs" in tests and "everyCitationIDResolvesToARealReferenceIndexEntry" in tests and "tegQueryMatchesTheDehydrationSkidFamily" in tests,
+# Third-generation port: step-by-step field technique playbooks, and a
+# real (gated, inert-everywhere-it-builds-today) on-device provider.
+"field techniques exist with sequence/evidence/stop conditions":"public let sequence: [String]" in techniques and "public let stopConditions: [String]" in techniques,
+"technique search is keyword-scored, no acceptance values given":"static func search(_ query: String" in techniques,
+"Apple Foundation Models provider is gated behind canImport, never unconditional":"#if canImport(FoundationModels)" in foundationprovider and "#endif" in foundationprovider,
+"foundation provider refuses enrichment on anything but confirmedSafe":"safety.status == .confirmedSafe" in foundationprovider,
+"foundation provider falls back to offline on unavailability and on error":foundationprovider.count("EEVeraOfflineProvider().reply(for: context, safety: safety)") >= 2,
+"provider resolver exists and defaults every non-FoundationModels build to offline":"enum EEVeraMentorProviderResolver" in capabilities and "return EEVeraOfflineProvider()" in capabilities,
+"runtime reply() consults the resolver instead of a hardcoded provider":"EEVeraMentorProviderResolver.provider()" in engine,
+"tests cover field techniques and resolver fallback safety":"allNineTechniquesArePresentWithUniqueIDs" in tests and "allowOnDevicePolicyStillResolvesToOfflineOnThisBuild" in tests,
 }
 for k,v in checks.items(): print(("PASS" if v else "FAIL"),k)
 raise SystemExit(0 if all(checks.values()) else 1)

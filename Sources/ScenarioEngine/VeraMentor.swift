@@ -205,7 +205,11 @@ public struct EEVeraMentorReply: Sendable {
 
 /// Implementations receive the already-gated context/response and may enrich
 /// language, but must not override `EEVeraMentorDiagnosticEngine`'s
-/// stop/escalate result. No implementation ships in this app yet.
+/// stop/escalate result. `EEVeraOfflineProvider` is the only implementation
+/// active on every build this game currently ships; `EEVeraAppleFoundation
+/// ModelProvider` (VeraAppleFoundationModelProvider.swift) exists but is
+/// gated behind `#if canImport(FoundationModels)` and is inert until built
+/// with an Xcode/SDK that actually has that framework.
 public protocol EEVeraMentorProvider: Sendable {
     var mode: EEVeraMentorMode { get }
     func reply(for context: EEVeraMentorContext, safety: EEVeraMentorDiagnosticResponse) async -> EEVeraMentorReply
@@ -241,7 +245,7 @@ public enum EEVeraMentorRuntime {
     /// single entry point UI code should use for mentor responses.
     public static func reply(for context: EEVeraMentorContext, provider: EEVeraMentorProvider? = nil) async -> EEVeraMentorReply {
         let safety = EEVeraSafetyRouter.gate(context)
-        let selectedProvider = provider ?? offline
+        let selectedProvider = provider ?? EEVeraMentorProviderResolver.provider()
         let base = await selectedProvider.reply(for: context, safety: safety)
         // Citations are attached here, after the provider runs, from the
         // bundled reference index — never invented by a provider. A stop

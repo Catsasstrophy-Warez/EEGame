@@ -585,3 +585,76 @@ import Foundation
         #expect(reply.equipmentExpertise.contains { $0.id == "teg-dehydration-skid" })
     }
 }
+
+@Suite("Vera mentor field techniques") struct VeraFieldTechniquesKnowledgeTests {
+    @Test func allNineTechniquesArePresentWithUniqueIDs() {
+        let ids = EEVeraFieldTechniquesKnowledge.all.map(\.id)
+        #expect(ids.count == 9)
+        #expect(Set(ids).count == 9)
+    }
+
+    @Test func everyTechniqueHasSubstantiveContentInEveryField() {
+        for technique in EEVeraFieldTechniquesKnowledge.all {
+            #expect(!technique.prerequisites.isEmpty, "\(technique.id) has no prerequisites")
+            #expect(!technique.sequence.isEmpty, "\(technique.id) has no sequence")
+            #expect(!technique.expectedEvidence.isEmpty, "\(technique.id) has no expectedEvidence")
+            #expect(!technique.fieldTips.isEmpty, "\(technique.id) has no fieldTips")
+            #expect(!technique.stopConditions.isEmpty, "\(technique.id) has no stopConditions")
+        }
+    }
+
+    @Test func loopCurrentQueryMatchesLoopDiagnosticsTechnique() {
+        let results = EEVeraFieldTechniquesKnowledge.search("4-20 mA loop current verification")
+        #expect(results.first?.id == "loop-current")
+    }
+
+    @Test func insulationResistanceQueryMatchesMeggerTechnique() {
+        let results = EEVeraFieldTechniquesKnowledge.search("megger insulation resistance motor cable")
+        #expect(results.first?.id == "insulation-resistance")
+    }
+
+    @Test func plcIOTraceQueryMatchesReadOnlyTraceTechnique() {
+        let results = EEVeraFieldTechniquesKnowledge.search("read only PLC IO trace tag mapping")
+        #expect(results.first?.id == "plc-io-trace")
+    }
+
+    @Test func everyTechniqueNamesForceOrOnlineEditOrEnergizedAsAStopWhereApplicable() {
+        let plcTechnique = EEVeraFieldTechniquesKnowledge.all.first { $0.id == "plc-io-trace" }
+        #expect(plcTechnique?.stopConditions.contains { $0.contains("Force, inhibit, online edit") } == true)
+    }
+}
+
+@Suite("Vera mentor provider resolver") struct VeraMentorProviderResolverTests {
+    @Test func offlineOnlyPolicyResolvesToTheOfflineProvider() {
+        var config = EEVeraMentorConfiguration()
+        config.providerPolicy = .offlineOnly
+        let provider = EEVeraMentorProviderResolver.provider(for: config)
+        #expect(provider.mode == .offlineDeterministic)
+    }
+
+    @Test func allowOnDevicePolicyStillResolvesToOfflineOnThisBuild() {
+        // On this Linux sandbox (and on the macos-xcode CI job's current
+        // Xcode 16), FoundationModels isn't importable, so even an
+        // allowOnDevice policy must safely fall back to offline — never
+        // crash, never silently do nothing.
+        var config = EEVeraMentorConfiguration()
+        config.providerPolicy = .allowOnDevice
+        let provider = EEVeraMentorProviderResolver.provider(for: config)
+        #expect(provider.mode == .offlineDeterministic)
+    }
+
+    @Test func allowConnectedPolicyResolvesToOffline() {
+        var config = EEVeraMentorConfiguration()
+        config.providerPolicy = .allowConnectedWithConsent
+        let provider = EEVeraMentorProviderResolver.provider(for: config)
+        #expect(provider.mode == .offlineDeterministic)
+    }
+
+    @Test func runtimeReplyUsesTheResolverByDefault() async {
+        var c = EEVeraMentorContext(domain: .electrical)
+        c.identityConfirmed = true
+        c.energyIsolatedAndVerified = true
+        let reply = await EEVeraMentorRuntime.reply(for: c)
+        #expect(reply.mode == .offlineDeterministic)
+    }
+}
