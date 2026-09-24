@@ -37,7 +37,8 @@ public enum EEFeatureReachabilityRegistry75 {
         .init(id: "instrument-cluster-88", title: "Rev88 Unified Instruments", workspace: .field, maturity: .integrated, accessibilityID: "rev88.instrumentCluster"),
         .init(id: "causal-ribbon-88", title: "Rev88 Causal Ribbon", workspace: .field, maturity: .integrated, accessibilityID: "rev88.causalRibbon"),
         .init(id: "reality-scene", title: "RealityKit Scene (Scaffold)", workspace: .quickBench, maturity: .implemented, accessibilityID: "commandHeader.realityScene"),
-        .init(id: "coal-mining", title: "Coal Mining Operations", workspace: .field, maturity: .integrated, accessibilityID: "field.coalMining")
+        .init(id: "coal-mining", title: "Coal Mining Operations", workspace: .field, maturity: .integrated, accessibilityID: "field.coalMining"),
+        .init(id: "vera-mentor", title: "Vera Mentor", workspace: .engineering, maturity: .integrated, accessibilityID: "engineering.veraMentor")
     ]
 }
 #endif

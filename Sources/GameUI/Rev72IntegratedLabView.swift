@@ -270,6 +270,9 @@ public struct Rev72IntegratedLabView: View {
                         }
                     }
                 }.accessibilityIdentifier("engineering.analysisLab")
+                EEInstrumentPanel75("Vera Mentor",subtitle:"SAFETY-GATED PEER DIAGNOSTIC COACHING") {
+                    EEVeraMentorPanel()
+                }.accessibilityIdentifier("engineering.veraMentor")
             }.padding(12)
         }
     }
