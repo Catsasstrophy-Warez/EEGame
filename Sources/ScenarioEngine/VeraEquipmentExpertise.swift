@@ -118,13 +118,20 @@ public enum EEVeraEquipmentExpertise {
     ]
 
     /// Keyword-scored match over a free-text query, same discipline as
-    /// `EEVeraReferenceIndex.retrieve`: simple, auditable substring scoring,
-    /// no domain restriction (equipment families already carry their own
-    /// domain tags and keywords), and never an empty result for a
-    /// nonsensical query — it just returns the whole list unscored.
-    public static func match(query: String, limit: Int = 3) -> [EEVeraEquipmentFamily] {
+    /// `EEVeraReferenceIndex.retrieve`: simple, auditable substring scoring.
+    /// `domain` is optional and, when given, actually scopes candidates to
+    /// families tagged for that domain first (e.g. a TEG-mentioning query
+    /// scoped to `.electrical` won't surface the TEG dehydration family,
+    /// which is only tagged `.naturalGas`/`.instrumentation`) — omit it to
+    /// search the full catalog regardless of domain, as the free-text
+    /// search tool in `VeraAppleFoundationModelProvider.swift` does. Unlike
+    /// the reference index's domain-scoped fallback, a query that matches
+    /// nothing within scope returns empty rather than the whole list —
+    /// equipment matches should be precise.
+    public static func match(domain: EEVeraMentorDomain? = nil, query: String, limit: Int = 3) -> [EEVeraEquipmentFamily] {
+        let candidates = domain.map { d in families.filter { $0.domains.contains(d) } } ?? families
         let needles = query.lowercased().split(separator: " ").map(String.init).filter { $0.count > 2 }
-        let scored: [(EEVeraEquipmentFamily, Int)] = families.map { family in
+        let scored: [(EEVeraEquipmentFamily, Int)] = candidates.map { family in
             let haystack = (family.keywords + [family.title]).joined(separator: " ").lowercased()
             let score = needles.reduce(0) { haystack.contains($1) ? $0 + 1 : $0 }
             return (family, score)

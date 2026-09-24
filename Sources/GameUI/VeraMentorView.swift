@@ -72,7 +72,7 @@ struct EEVeraMentorPanel: View {
             Toggle("Retain audit log", isOn: $configuration.retainAuditLog).accessibilityIdentifier("vera.retainAuditLog")
                 .onChange(of: configuration) { _, newValue in EEVeraMentorStore.saveConfiguration(newValue) }
 
-            Text("Spec \(EEVeraMentorSpecification.version) · assumed \(EEVeraMentorSpecification.assumedCodeEdition) · no on-device or connected model is installed — every reply above came from the deterministic offline mentor.")
+            Text("Spec \(EEVeraMentorSpecification.version) · assumed \(EEVeraMentorSpecification.assumedCodeEdition) · \(providerStatusText)")
                 .font(.system(size: 9)).foregroundStyle(.secondary).accessibilityIdentifier("vera.specVersion")
 
             Button(showAudit ? "HIDE AUDIT LOG" : "SHOW AUDIT LOG") { showAudit.toggle() }
@@ -87,6 +87,15 @@ struct EEVeraMentorPanel: View {
                 EEVeraReferenceLibraryView(domain: domain)
             }
         }
+    }
+
+    private var providerStatusText: String {
+        guard let reply else {
+            return "no on-device or connected model is installed — replies below will come from the deterministic offline mentor."
+        }
+        return reply.mode == .offlineDeterministic
+            ? "no on-device or connected model is installed — this reply came from the deterministic offline mentor."
+            : "this reply was enriched by \(reply.mode.rawValue); the local safety gate above remains authoritative regardless."
     }
 
     private func policyLabel(_ policy: EEVeraProviderPolicy) -> String {

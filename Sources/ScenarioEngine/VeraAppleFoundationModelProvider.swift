@@ -41,7 +41,7 @@ private struct EEVeraLocalReferenceTool: Tool {
     @MainActor
     func call(arguments: Arguments) async throws -> String {
         let citations = EEVeraReferenceIndex.retrieve(domain: domain, query: arguments.query, limit: 5)
-        let equipment = EEVeraEquipmentExpertise.match(query: arguments.query, limit: 3)
+        let equipment = EEVeraEquipmentExpertise.match(domain: domain, query: arguments.query, limit: 3)
         let techniques = EEVeraFieldTechniquesKnowledge.search(arguments.query, limit: 3)
         let citationText = citations.map { "\($0.source.rawValue) \($0.citation): \($0.summary)" }
         let equipmentText = equipment.map { "\($0.title): \($0.firstChecks.joined(separator: "; "))" }
@@ -98,7 +98,7 @@ public struct EEVeraAppleFoundationModelProvider: EEVeraMentorProvider {
                 citations: EEVeraReferenceIndex.retrieve(domain: context.domain, query: context.symptom),
                 controllingAuthorities: EEVeraCodeKnowledge.references(for: context.domain),
                 standardsRoute: EEVeraStandardsNavigator.route(question: context.symptom, domain: context.domain),
-                equipmentExpertise: EEVeraEquipmentExpertise.match(query: context.symptom)
+                equipmentExpertise: EEVeraEquipmentExpertise.match(domain: context.domain, query: context.symptom)
             )
         } catch {
             return await EEVeraOfflineProvider().reply(for: context, safety: safety)

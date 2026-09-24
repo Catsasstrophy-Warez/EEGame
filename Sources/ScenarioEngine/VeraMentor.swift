@@ -259,7 +259,7 @@ public enum EEVeraMentorRuntime {
         // matched the query.
         let authorities = EEVeraCodeKnowledge.references(for: context.domain)
         let route = EEVeraStandardsNavigator.route(question: context.symptom, domain: context.domain)
-        let equipment = EEVeraEquipmentExpertise.match(query: query)
+        let equipment = EEVeraEquipmentExpertise.match(domain: context.domain, query: query)
         return EEVeraMentorReply(
             mode: base.mode, safety: base.safety, explanation: base.explanation,
             citations: citations, controllingAuthorities: authorities, standardsRoute: route,

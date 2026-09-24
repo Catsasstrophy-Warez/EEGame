@@ -584,6 +584,33 @@ import Foundation
         let reply = await EEVeraMentorRuntime.reply(for: c)
         #expect(reply.equipmentExpertise.contains { $0.id == "teg-dehydration-skid" })
     }
+
+    /// Regression test: match() used to ignore each family's declared
+    /// `domains` entirely (confirmed by grep — nothing read that field),
+    /// so a TEG-mentioning query scoped to an unrelated domain still
+    /// surfaced the TEG family. Domain scoping is optional (nil searches
+    /// everything, as the free-text search tool does) but when given must
+    /// actually restrict candidates to that domain's tagged families.
+    @Test func domainScopedMatchExcludesFamiliesNotTaggedForThatDomain() {
+        let inScope = EEVeraEquipmentExpertise.match(domain: .naturalGas, query: "TEG reboiler")
+        #expect(inScope.contains { $0.id == "teg-dehydration-skid" })
+        let outOfScope = EEVeraEquipmentExpertise.match(domain: .electrical, query: "TEG reboiler")
+        #expect(!outOfScope.contains { $0.id == "teg-dehydration-skid" })
+    }
+
+    @Test func unscopedMatchStillSearchesTheFullCatalog() {
+        let results = EEVeraEquipmentExpertise.match(query: "TEG reboiler")
+        #expect(results.contains { $0.id == "teg-dehydration-skid" })
+    }
+
+    @Test func replyOnlyAttachesEquipmentExpertiseTaggedForTheContextDomain() async {
+        var c = EEVeraMentorContext(domain: .electrical, symptom: "TEG reboiler running hot on the glycol skid")
+        c.identityConfirmed = true
+        c.energyIsolatedAndVerified = true
+        let reply = await EEVeraMentorRuntime.reply(for: c)
+        #expect(!reply.equipmentExpertise.contains { $0.id == "teg-dehydration-skid" })
+        for family in reply.equipmentExpertise { #expect(family.domains.contains(.electrical)) }
+    }
 }
 
 @Suite("Vera mentor field techniques") struct VeraFieldTechniquesKnowledgeTests {
@@ -656,5 +683,27 @@ import Foundation
         c.energyIsolatedAndVerified = true
         let reply = await EEVeraMentorRuntime.reply(for: c)
         #expect(reply.mode == .offlineDeterministic)
+    }
+
+    /// Regression test: replyWithAudit used to resolve its provider from
+    /// `.standard` UserDefaults via EEVeraMentorProviderResolver's own
+    /// default argument, silently ignoring the `configuration` the caller
+    /// explicitly passed in. This is a black-box way to prove the passed
+    /// configuration is actually consulted: a custom provider injected
+    /// through resolving `EEVeraMentorProviderResolver.provider(for:)`
+    /// directly must match what replyWithAudit's mode ends up being for
+    /// the same configuration, on every policy value.
+    @Test func replyWithAuditResolvesFromThePassedConfigurationNotStandardDefaults() async {
+        let d = UserDefaults(suiteName: "vera.mentor.tests.\(UUID().uuidString)")!
+        for policy in EEVeraProviderPolicy.allCases {
+            var config = EEVeraMentorConfiguration()
+            config.providerPolicy = policy
+            let expectedMode = EEVeraMentorProviderResolver.provider(for: config).mode
+            var c = EEVeraMentorContext(domain: .electrical)
+            c.identityConfirmed = true
+            c.energyIsolatedAndVerified = true
+            let reply = await EEVeraMentorRuntime.replyWithAudit(for: c, configuration: config, defaults: d)
+            #expect(reply.mode == expectedMode, "policy \(policy) expected mode \(expectedMode) but got \(reply.mode)")
+        }
     }
 }

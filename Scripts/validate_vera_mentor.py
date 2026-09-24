@@ -34,7 +34,7 @@ checks={
 # Capabilities: persisted policy/audit, live-state context builders.
 "audit store persists via UserDefaults":"enum EEVeraMentorStore" in capabilities and "UserDefaults" in capabilities,
 "audit log is bounded":"maxAuditEntries" in capabilities and "suffix(maxAuditEntries)" in capabilities,
-"replyWithAudit never bypasses the gate":"static func replyWithAudit" in capabilities and "await self.reply(for: context)" in capabilities,
+"replyWithAudit never bypasses the gate":"static func replyWithAudit" in capabilities and "await self.reply(for: context, provider:" in capabilities,
 "coal mining context reads real sensor state":"static func coalMining(" in capabilities and "state.atmosphere[mine]?.sensors" in capabilities,
 "facility power context reads real trip cause":"static func facilityPower(" in capabilities and "state.protection.tripCause != .none" in capabilities,
 "vera panel exposes provider policy and audit log":"vera.providerPolicy" in ui and "vera.auditLog" in ui,
@@ -92,8 +92,8 @@ checks={
 # actual reference index (never an invented citation id).
 "all 10 requested equipment families are present":equipment.count('.init(id: "') >= 10,
 "equipment families cover ESD/blowdown, LEL detection, TEG, and safety PLCs":all(s in equipment for s in ['id: "esd-shutdown-blowdown"','id: "lel-toxic-gas-detection"','id: "teg-dehydration-skid"','id: "safety-plc-rtu-cause-effect"']),
-"equipment match() is keyword-scored and domain-agnostic":"static func match(query: String" in equipment,
-"reply always carries equipmentExpertise":"equipmentExpertise: [EEVeraEquipmentFamily]" in engine and "EEVeraEquipmentExpertise.match(query: query)" in engine,
+"equipment match() is keyword-scored, domain optional":"static func match(domain: EEVeraMentorDomain? = nil, query: String" in equipment,
+"reply always carries equipmentExpertise":"equipmentExpertise: [EEVeraEquipmentFamily]" in engine and "EEVeraEquipmentExpertise.match(domain: context.domain, query: query)" in engine,
 "UI surfaces equipment expertise in the reply":"vera.equipmentExpertise" in ui,
 "tests cover all 10 families, citation-id integrity, and query matching":"allTenRequestedFamiliesArePresentWithUniqueIDs" in tests and "everyCitationIDResolvesToARealReferenceIndexEntry" in tests and "tegQueryMatchesTheDehydrationSkidFamily" in tests,
 # Third-generation port: step-by-step field technique playbooks, and a
@@ -106,6 +106,18 @@ checks={
 "provider resolver exists and defaults every non-FoundationModels build to offline":"enum EEVeraMentorProviderResolver" in capabilities and "return EEVeraOfflineProvider()" in capabilities,
 "runtime reply() consults the resolver instead of a hardcoded provider":"EEVeraMentorProviderResolver.provider()" in engine,
 "tests cover field techniques and resolver fallback safety":"allNineTechniquesArePresentWithUniqueIDs" in tests and "allowOnDevicePolicyStillResolvesToOfflineOnThisBuild" in tests,
+# Full-file-read analysis pass: found and fixed 2 real bugs.
+# 1) replyWithAudit used to ignore its own `configuration` param for
+#    provider selection, silently resolving from .standard defaults
+#    instead. Regression guard: it must pass a resolved provider in.
+"replyWithAudit resolves its provider from the passed configuration, not hidden defaults":"await self.reply(for: context, provider: EEVeraMentorProviderResolver.provider(for: configuration))" in capabilities,
+# 2) EEVeraEquipmentFamily.domains was declared but never read by
+#    match() — a query could surface equipment tagged for an unrelated
+#    domain. Regression guard: match() must accept and apply a domain
+#    filter, and the runtime must pass context.domain through.
+"equipment match() actually filters candidates by domain when given one":"public static func match(domain: EEVeraMentorDomain? = nil, query: String" in equipment and "families.filter { $0.domains.contains(d) }" in equipment,
+"runtime scopes equipment expertise to the context's own domain":"EEVeraEquipmentExpertise.match(domain: context.domain, query: query)" in engine,
+"tests cover both bug fixes":"replyWithAuditResolvesFromThePassedConfigurationNotStandardDefaults" in tests and "domainScopedMatchExcludesFamiliesNotTaggedForThatDomain" in tests,
 }
 for k,v in checks.items(): print(("PASS" if v else "FAIL"),k)
 raise SystemExit(0 if all(checks.values()) else 1)

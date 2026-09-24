@@ -96,17 +96,18 @@ public enum EEVeraMentorStore {
 extension EEVeraMentorRuntime {
     /// Same single entry point as `reply(for:provider:)`, but also persists
     /// a bounded audit event (mode, safety verdict, timestamp, equipment ID)
-    /// when the configuration's `retainAuditLog` is set. Provider policy
-    /// selection is read from `configuration` but — matching the upstream
-    /// app's resolver — every policy still resolves to the offline provider
-    /// until a real on-device/connected adapter ships; this keeps the
-    /// promise explicit rather than silently pretending one exists.
+    /// when the configuration's `retainAuditLog` is set. Provider selection
+    /// is resolved from the given `configuration` explicitly (never from
+    /// `.standard` defaults behind the caller's back), so a caller — a test
+    /// with an isolated UserDefaults suite, or a future settings screen —
+    /// can rely on the policy it passed actually governing which provider
+    /// answers this call.
     public static func replyWithAudit(
         for context: EEVeraMentorContext,
         configuration: EEVeraMentorConfiguration = EEVeraMentorStore.loadConfiguration(),
         defaults: UserDefaults = .standard
     ) async -> EEVeraMentorReply {
-        let reply = await self.reply(for: context)
+        let reply = await self.reply(for: context, provider: EEVeraMentorProviderResolver.provider(for: configuration))
         if configuration.retainAuditLog {
             EEVeraMentorStore.append(
                 EEVeraAuditEvent(
