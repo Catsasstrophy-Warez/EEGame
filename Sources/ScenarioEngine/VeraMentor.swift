@@ -36,7 +36,9 @@ public enum EEVeraMentorDomain: String, CaseIterable, Codable, Sendable, Identif
 
 public struct EEVeraMentorPathway: Sendable {
     public let domain: EEVeraMentorDomain
+    public let firstQuestions: [String]
     public let independentEvidence: [String]
+    public let commonFalsePositives: [String]
     public let escalationTriggers: [String]
 }
 
@@ -45,27 +47,39 @@ public enum EEVeraMentorDomainKnowledge {
         switch domain {
         case .electrical:
             EEVeraMentorPathway(domain: domain,
+                firstQuestions: ["What is the exact source, load, voltage class, and one-line reference?", "Is the symptom local to one load or shared by several loads?", "What changed immediately before the symptom: switching, maintenance, weather, or process load?"],
                 independentEvidence: ["Verify source and control power at the correct test points", "Check phase-to-phase/phase-to-ground condition against the approved procedure", "Compare protective-device, contactor, overload, and PLC permissive states"],
+                commonFalsePositives: ["A healthy control signal with a failed power path", "A tripped permissive mistaken for a bad motor", "A meter reference or test-lead error", "A shared 24 VDC or neutral problem presenting as several device faults"],
                 escalationTriggers: ["Arc-flash boundary or energized work is involved", "Backfeed, induced voltage, or an unidentified source is possible", "Protective devices, ESD, or interlocks would need to be bypassed"])
         case .instrumentation:
             EEVeraMentorPathway(domain: domain,
+                firstQuestions: ["Is the process variable independently credible?", "What are the transmitter range, units, damping, output mode, and last calibration state?", "Where does the signal first disagree: sensor, transmitter, wiring/barrier, I/O, logic, or display?"],
                 independentEvidence: ["Compare a safe independent process indication with the instrument PV", "Trace the 4-20 mA/pulse/discrete signal at defined boundaries", "Confirm loop power, polarity, terminations, barrier/fuse status, and AI scaling"],
+                commonFalsePositives: ["A process upset blamed on the transmitter", "Correct current with incorrect range or scaling", "A frozen HMI value mistaken for a field fault", "A damaged impulse line, plugged filter, or lost instrument air"],
                 escalationTriggers: ["Calibration would alter a protective, custody, or emissions function", "Opening a hazardous enclosure or disturbing impulse tubing is required", "The instrument identity, range, or approved test point is uncertain"])
         case .naturalGas:
             EEVeraMentorPathway(domain: domain,
+                firstQuestions: ["What station, line-up, pressure boundary, and operating mode are involved?", "Is there a confirmed gas release, odor, detector alarm, fire indication, or abnormal pressure trend?", "Is the indication for operations, protection, custody measurement, or all three?"],
                 independentEvidence: ["Use approved area classification drawings, P&IDs, and the current operating procedure", "Compare pressure, temperature, flow, and valve position with independent indications", "Check gas detection, ESD, flame detection, compressor permissives, and instrument-air status"],
+                commonFalsePositives: ["A detector fault treated as a gas release or a gas release treated as a detector fault", "A valve command assumed to equal valve position", "A custody-meter discrepancy caused by configuration or sampling changes", "A compressor trip blamed on one sensor when a permissive chain is open"],
                 escalationTriggers: ["Any confirmed/suspected release, fire, loss of containment, or unexplained detector response", "Pressure boundary, relief, ESD, compressor protection, or custody measurement is affected", "The area classification, gas test, permit, or operating state is not known"])
         case .coalMining:
             EEVeraMentorPathway(domain: domain,
+                firstQuestions: ["Which mine, section, and ventilation split are involved?", "Is a methane or CO reading trending, or a single spurious sample?", "Is the affected equipment on the intake or return side of the ventilation circuit?"],
                 independentEvidence: ["Confirm methane% and CO ppm at the affected ventilation branch before anything else", "Compare shearer/AFC/shield telemetry against the last known-good baseline", "Check the incident recorder for the earliest abnormal frame, not the loudest one"],
+                commonFalsePositives: ["A drifting sensor calibration mistaken for a real atmosphere change", "A belt bearing heat event mistaken for a methane ignition risk (both trip CO, for different reasons)", "A shield-advance stall blamed on hydraulics when the real cause is a roof condition"],
                 escalationTriggers: ["Methane reads above the alarm threshold at any monitored sensor", "A hydraulic shield, AFC, or belt protective interlock is affected", "Ventilation fan pressure or airflow has dropped below the approved minimum"])
         case .rotatingEquipment:
             EEVeraMentorPathway(domain: domain,
+                firstQuestions: ["What changed in vibration, speed, lube oil, suction/discharge, temperature, or load?", "Is the trip real, nuisance, or a missing/invalid signal?", "What protection and permissive chain acted first?"],
                 independentEvidence: ["Confirm process conditions and local mechanical indicators before touching a probe or coupling", "Compare redundant vibration/speed/temperature channels, not one", "Check lube oil, seal gas, cooling, instrument air, and driver permissives", "Preserve trip logs and pre-trip trends before any reset"],
+                commonFalsePositives: ["A probe installation problem mistaken for bearing damage", "A real process upset mistaken for a protection-device failure", "A stale HMI value during a communications loss read as a real trip condition"],
                 escalationTriggers: ["Protection is active or a restart could damage equipment", "A guard, coupling, or pressure boundary would be disturbed", "The cause-and-effect or trip-reset authority is unclear"])
         case .processSafety:
             EEVeraMentorPathway(domain: domain,
+                firstQuestions: ["Which protective layer is affected and what hazardous scenario does it prevent?", "What is the required safe state and who owns the operating decision?", "What evidence is needed before return to service?"],
                 independentEvidence: ["Review current cause-and-effect, proof-test, bypass, and impairment records", "Confirm alarm, trip, final element, and feedback independently", "Record the exact device identity, state, time, and permissive/interlock context"],
+                commonFalsePositives: ["A healthy final element with a failed feedback path", "A bypass or inhibited alarm hidden in a control-system view", "A reset interpreted as a repair"],
                 escalationTriggers: ["A safety function is unavailable, bypassed, or repeatedly failing", "A test could initiate a hazardous state", "The required impairment response or compensating measure is unknown"])
         }
     }

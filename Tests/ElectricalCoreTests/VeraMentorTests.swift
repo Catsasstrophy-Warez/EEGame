@@ -290,4 +290,49 @@ import Foundation
         let results = EEVeraReferenceIndex.retrieve(domain: .rotatingEquipment, query: "vibration severity zone")
         #expect(results.contains { $0.id == "field-vibration-severity-zones" })
     }
+
+    @Test func lotoQueryFindsBothOSHAAndNFPA70ECitations() {
+        let results = EEVeraReferenceIndex.retrieve(domain: .electrical, query: "lockout tagout energy control")
+        #expect(results.contains { $0.id == "osha-1910.147" })
+    }
+
+    @Test func areaClassificationQueryFindsAPIAndNECCitations() {
+        let results = EEVeraReferenceIndex.retrieve(domain: .naturalGas, query: "area classification study petroleum")
+        #expect(results.contains { $0.id == "api-rp-500-505" })
+    }
+
+    @Test func safetyInstrumentedSystemQueryFindsIEC61511() {
+        let results = EEVeraReferenceIndex.retrieve(domain: .processSafety, query: "SIL proof test safety instrumented system")
+        #expect(results.contains { $0.id == "iec-61511-isa-84" })
+    }
+
+    @Test func confinedSpaceQueryReachesCoalMiningAndNaturalGas() {
+        let coal = EEVeraReferenceIndex.retrieve(domain: .coalMining, query: "confined space entry permit")
+        let gas = EEVeraReferenceIndex.retrieve(domain: .naturalGas, query: "confined space entry permit")
+        #expect(coal.contains { $0.id == "osha-1910.146" })
+        #expect(gas.contains { $0.id == "osha-1910.146" })
+    }
+}
+
+@Suite("Vera mentor pathway depth") struct VeraMentorPathwayTests {
+    @Test func everyDomainHasFirstQuestionsAndFalsePositives() {
+        for domain in EEVeraMentorDomain.allCases {
+            let pathway = EEVeraMentorDomainKnowledge.pathway(for: domain)
+            #expect(!pathway.firstQuestions.isEmpty, "\(domain) has no first questions")
+            #expect(!pathway.commonFalsePositives.isEmpty, "\(domain) has no false positives")
+            #expect(!pathway.independentEvidence.isEmpty, "\(domain) has no independent evidence")
+            #expect(!pathway.escalationTriggers.isEmpty, "\(domain) has no escalation triggers")
+        }
+    }
+
+    @Test func confirmedSafeResponseCarriesTheDomainPathway() {
+        var c = EEVeraMentorContext(domain: .coalMining)
+        c.identityConfirmed = true
+        c.areaClassificationKnown = true
+        c.gasTestCurrent = true
+        c.energyIsolatedAndVerified = true
+        let response = EEVeraMentorDiagnosticEngine.response(for: c)
+        #expect(response.pathway.domain == .coalMining)
+        #expect(response.pathway.commonFalsePositives.contains { $0.contains("methane ignition") || $0.contains("bearing heat") })
+    }
 }

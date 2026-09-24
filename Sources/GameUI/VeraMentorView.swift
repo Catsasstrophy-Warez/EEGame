@@ -37,6 +37,12 @@ struct EEVeraMentorPanel: View {
                 ForEach(EEVeraMentorDomain.allCases) { Text($0.title).tag($0) }
             }.pickerStyle(.segmented).accessibilityIdentifier("vera.domainPicker")
 
+            DisclosureGroup("What Vera will ask about first in this domain") {
+                ForEach(EEVeraMentorDomainKnowledge.pathway(for: domain).firstQuestions, id: \.self) { q in
+                    Text("• \(q)").font(.caption2).foregroundStyle(.secondary)
+                }
+            }.font(.caption).accessibilityIdentifier("vera.firstQuestions")
+
             TextField("Equipment ID / tag", text: $equipmentID)
                 .textFieldStyle(.roundedBorder).accessibilityIdentifier("vera.equipmentID")
             TextField("Symptom", text: $symptom)
@@ -130,6 +136,14 @@ private struct EEVeraMentorReplyView: View {
 
             ForEach(reply.safety.nextActions, id: \.self) { action in
                 Label(action, systemImage: "arrow.right.circle").font(.footnote)
+            }
+
+            if reply.safety.status == .confirmedSafe {
+                DisclosureGroup("Common false positives in this domain") {
+                    ForEach(reply.safety.pathway.commonFalsePositives, id: \.self) { fp in
+                        Text("• \(fp)").font(.caption2).foregroundStyle(.secondary)
+                    }
+                }.font(.caption).accessibilityIdentifier("vera.falsePositives")
             }
 
             Text(reply.explanation).font(.footnote).italic().padding(.top, 4)

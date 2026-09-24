@@ -50,6 +50,15 @@ checks={
 "library() groups by source for query-independent browsing":"static func library(for domain: EEVeraMentorDomain)" in refindex and "Dictionary(grouping:" in refindex,
 "UI exposes the browse-library view":"EEVeraReferenceLibraryView" in ui and "vera.referenceLibrary" in ui,
 "tests cover the expanded library and MSHA citation":"everyDomainHasAtLeastOneLibraryEntry" in tests and "methaneMonitoringQueryFindsMSHACitation" in tests,
+# Even deeper: OSHA + industry-standard sources, restored
+# firstQuestions/commonFalsePositives pathway depth, and UI surfacing
+# of both.
+"OSHA and industry-standard sources exist":'case osha = "OSHA (29 CFR)"' in refindex and 'case industryStandard = "Industry standard"' in refindex,
+"pathway restores firstQuestions and commonFalsePositives":"public let firstQuestions: [String]" in engine and "public let commonFalsePositives: [String]" in engine,
+"every domain pathway has first questions and false positives populated":engine.count("firstQuestions:") >= 6 and engine.count("commonFalsePositives:") >= 6,
+"UI surfaces first questions and false positives, not just next actions":"vera.firstQuestions" in ui and "vera.falsePositives" in ui,
+"tests cover pathway depth across every domain":"everyDomainHasFirstQuestionsAndFalsePositives" in tests,
+"tests cover OSHA/industry-standard retrieval":"lotoQueryFindsBothOSHAAndNFPA70ECitations" in tests and "safetyInstrumentedSystemQueryFindsIEC61511" in tests,
 }
 for k,v in checks.items(): print(("PASS" if v else "FAIL"),k)
 raise SystemExit(0 if all(checks.values()) else 1)

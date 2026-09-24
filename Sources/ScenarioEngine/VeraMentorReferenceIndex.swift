@@ -18,6 +18,8 @@ public enum EEVeraReferenceSource: String, Codable, Sendable, CaseIterable {
     case nec = "NEC (NFPA 70)"
     case nfpa70E = "NFPA 70E"
     case msha = "MSHA (30 CFR)"
+    case osha = "OSHA (29 CFR)"
+    case industryStandard = "Industry standard"
     case fieldReferenceGuide = "Field quick-reference"
 }
 
@@ -103,6 +105,50 @@ public enum EEVeraReferenceIndex {
         .init(id: "nec-505", source: .nec, citation: "NEC Article 505",
               summary: "Zone 0/1/2 classification system for Class I locations (the IEC-aligned alternative to the Division system in Article 501) — an installation uses one system or the other per its area classification documentation, not a mix.",
               domains: [.naturalGas, .processSafety], keywords: ["zone 0", "zone 1", "zone 2", "iec classification"]),
+        .init(id: "nec-210.19", source: .nec, citation: "NEC 210.19",
+              summary: "Branch-circuit conductor minimum ampacity/sizing basis, including the general continuous-load 125% sizing consideration — a rule the loaded-conductor-in-a-continuous-duty circuit case checks against, separate from Table 310.16 ampacity itself.",
+              domains: [.electrical], keywords: ["branch circuit sizing", "continuous load", "125 percent"]),
+        .init(id: "nec-215.2", source: .nec, citation: "NEC 215.2",
+              summary: "Feeder conductor minimum size and ampacity requirements — the feeder-level counterpart to 210.19's branch-circuit sizing rule.",
+              domains: [.electrical], keywords: ["feeder sizing", "feeder ampacity"]),
+        .init(id: "nec-220", source: .nec, citation: "NEC Article 220",
+              summary: "Load calculation methods: general/standard vs. optional calculation procedures for determining a service, feeder, or branch circuit's calculated load — the basis a sizing exercise starts from before any table lookup.",
+              domains: [.electrical], keywords: ["load calculation", "demand factor", "service sizing"]),
+        .init(id: "nec-695", source: .nec, citation: "NEC Article 695",
+              summary: "Fire pumps: dedicated power source requirements, overcurrent protection philosophy (sized to allow motor locked-rotor current to pass rather than trip), and transfer switch requirements distinct from ordinary motor circuits.",
+              domains: [.electrical, .processSafety], keywords: ["fire pump", "locked rotor", "dedicated feeder"]),
+
+        // OSHA — general industry electrical safety and permit requirements
+        // (public federal regulation, same edition/amendment-verification
+        // caveat as every other regulatory source in this index)
+        .init(id: "osha-1910.147", source: .osha, citation: "29 CFR 1910.147",
+              summary: "The general-industry lockout/tagout standard: energy-control program elements, the concept of an authorized vs. affected employee, and periodic inspection requirements — the general-industry counterpart to NFPA 70E's electrically-specific Article 120 procedure.",
+              domains: [.electrical, .instrumentation, .rotatingEquipment, .coalMining, .processSafety], keywords: ["loto", "lockout tagout", "energy control program", "authorized employee"]),
+        .init(id: "osha-1910.269", source: .osha, citation: "29 CFR 1910.269",
+              summary: "Electric power generation, transmission, and distribution: minimum approach distances, qualification requirements, and work-practice rules specific to utility-scale electrical work — distinct in scope from general industrial electrical maintenance.",
+              domains: [.electrical, .rotatingEquipment], keywords: ["power generation", "transmission", "minimum approach distance", "utility"]),
+        .init(id: "osha-1910.146", source: .osha, citation: "29 CFR 1910.146",
+              summary: "Permit-required confined space entry: atmospheric testing, permit system, attendant/entrant roles, and rescue provisions — directly relevant any time troubleshooting would require entering a vessel, sump, or other confined space in a mine or process facility.",
+              domains: [.coalMining, .naturalGas, .processSafety], keywords: ["confined space", "permit required", "atmospheric testing", "entry"]),
+
+        // Industry standards — area classification methodology and
+        // functional-safety/arc-flash calculation methods referenced by,
+        // but distinct from, the NEC/NFPA 70E articles above.
+        .init(id: "api-rp-500-505", source: .industryStandard, citation: "API RP 500 / API RP 505",
+              summary: "Recommended practice for classifying locations at petroleum facilities: API RP 500 uses the Class/Division system, API RP 505 the Zone system — the area-classification methodology a natural-gas facility's drawings are typically built from, feeding directly into which NEC article (501 or 505) governs the installation.",
+              domains: [.naturalGas, .processSafety], keywords: ["api rp 500", "api rp 505", "area classification study", "petroleum facility"]),
+        .init(id: "nfpa-497", source: .industryStandard, citation: "NFPA 497",
+              summary: "Recommended practice for classifying flammable-liquid/gas areas, an alternative area-classification methodology to the API RPs, referenced by facilities outside the petroleum-specific API scope.",
+              domains: [.naturalGas, .processSafety], keywords: ["nfpa 497", "flammable liquid classification", "area classification"]),
+        .init(id: "nfpa-496", source: .industryStandard, citation: "NFPA 496",
+              summary: "Purged and pressurized enclosures for electrical equipment: the Type X/Y/Z purge-protection concept used to install standard (non-explosion-proof) electrical equipment inside a classified area, with continuous purge/pressure monitoring.",
+              domains: [.naturalGas, .instrumentation, .processSafety], keywords: ["purge", "pressurization", "type x", "type y", "type z"]),
+        .init(id: "ieee-1584", source: .industryStandard, citation: "IEEE 1584",
+              summary: "The incident-energy calculation method that NFPA 70E's risk assessment (130.5) references for the analytical method — bolted fault current, arc gap, working distance, and equipment class are the real inputs, so a stale short-circuit study invalidates the arc-flash label even if nothing else changed.",
+              domains: [.electrical, .instrumentation, .rotatingEquipment], keywords: ["incident energy calculation", "arc flash study", "short circuit study", "arc flash label"]),
+        .init(id: "iec-61511-isa-84", source: .industryStandard, citation: "IEC 61511 / ISA-84.00.01",
+              summary: "Functional safety standard for safety instrumented systems (SIS) in the process industries: safety integrity level (SIL) selection, proof-test intervals, and the safety lifecycle a SIS's design and maintenance are meant to follow — the standard a process-safety impairment or bypass decision is ultimately measured against.",
+              domains: [.processSafety, .naturalGas, .instrumentation], keywords: ["sis", "sil", "safety instrumented system", "proof test", "functional safety"]),
 
         // NFPA 70E — energized-work and shock/arc-flash protection
         .init(id: "nfpa70e-120", source: .nfpa70E, citation: "NFPA 70E Article 120",
