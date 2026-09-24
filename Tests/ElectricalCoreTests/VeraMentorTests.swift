@@ -253,4 +253,41 @@ import Foundation
         #expect(reply.safety.status == .stopAndEscalate)
         #expect(!reply.citations.isEmpty)
     }
+
+    @Test func libraryIsScopedToOneDomainAndGroupedBySource() {
+        let library = EEVeraReferenceIndex.library(for: .coalMining)
+        #expect(!library.isEmpty)
+        for (_, citations) in library {
+            for c in citations { #expect(c.domains.contains(.coalMining)) }
+        }
+        // Coal mining is the one domain with MSHA (30 CFR) entries.
+        #expect(library[.msha]?.isEmpty == false)
+    }
+
+    @Test func everyDomainHasAtLeastOneLibraryEntry() {
+        for domain in EEVeraMentorDomain.allCases {
+            let library = EEVeraReferenceIndex.library(for: domain)
+            let total = library.values.reduce(0) { $0 + $1.count }
+            #expect(total > 0, "\(domain) has no reference entries")
+        }
+    }
+
+    @Test func methaneMonitoringQueryFindsMSHACitation() {
+        let results = EEVeraReferenceIndex.retrieve(domain: .coalMining, query: "methane monitoring de-energization")
+        #expect(results.contains { $0.id == "msha-75.323" })
+    }
+
+    @Test func classifiedAreaLibraryDistinguishesClassIAndClassII() {
+        let gasLibrary = EEVeraReferenceIndex.library(for: .naturalGas)
+        let coalLibrary = EEVeraReferenceIndex.library(for: .coalMining)
+        let gasIDs = Set((gasLibrary[.nec] ?? []).map(\.id))
+        let coalIDs = Set((coalLibrary[.nec] ?? []).map(\.id))
+        #expect(gasIDs.contains("nec-501"))
+        #expect(coalIDs.contains("nec-503"))
+    }
+
+    @Test func vibrationQueryFindsRotatingEquipmentFieldReference() {
+        let results = EEVeraReferenceIndex.retrieve(domain: .rotatingEquipment, query: "vibration severity zone")
+        #expect(results.contains { $0.id == "field-vibration-severity-zones" })
+    }
 }

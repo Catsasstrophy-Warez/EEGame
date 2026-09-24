@@ -17,6 +17,7 @@ import Foundation
 public enum EEVeraReferenceSource: String, Codable, Sendable, CaseIterable {
     case nec = "NEC (NFPA 70)"
     case nfpa70E = "NFPA 70E"
+    case msha = "MSHA (30 CFR)"
     case fieldReferenceGuide = "Field quick-reference"
 }
 
@@ -66,6 +67,42 @@ public enum EEVeraReferenceIndex {
         .init(id: "nec-700", source: .nec, citation: "NEC 700-702 (Articles)",
               summary: "Emergency, legally required standby, and optional standby power systems: transfer equipment, wiring, and testing/maintenance requirements.",
               domains: [.electrical, .processSafety], keywords: ["emergency power", "standby", "transfer switch", "generator"]),
+        .init(id: "nec-90.4", source: .nec, citation: "NEC 90.4",
+              summary: "Enforcement and the AHJ's authority: the AHJ interprets rules, approves equipment/materials, and grants special permission — a reminder that the code text alone does not settle an ambiguous field question; the AHJ's interpretation of the adopted edition does.",
+              domains: [.electrical, .instrumentation, .naturalGas, .coalMining, .rotatingEquipment, .processSafety], keywords: ["ahj", "authority having jurisdiction", "interpretation", "enforcement"]),
+        .init(id: "nec-100", source: .nec, citation: "NEC Article 100",
+              summary: "Definitions used throughout the code, including \"qualified person\" — the defined term that gates who may perform many of the tasks NFPA 70E and the NEC both reference.",
+              domains: [.electrical, .instrumentation, .rotatingEquipment, .processSafety], keywords: ["qualified person", "definition", "terminology"]),
+        .init(id: "nec-300", source: .nec, citation: "NEC Article 300",
+              summary: "General wiring methods and materials requirements applicable across raceway/cable types: conductor protection, burial depth, and general installation requirements common to most wiring methods.",
+              domains: [.electrical, .instrumentation], keywords: ["wiring method", "raceway", "burial depth", "conductor protection"]),
+        .init(id: "nec-314", source: .nec, citation: "NEC 314.16",
+              summary: "Box fill calculation: how conductors, devices, and fittings count against a box's cubic-inch volume allowance for a given conductor size.",
+              domains: [.electrical], keywords: ["box fill", "junction box", "pull box", "cubic inch"]),
+        .init(id: "nec-408", source: .nec, citation: "NEC 408 (Article)",
+              summary: "Switchboards, switchgear, and panelboards: overcurrent protection, clearances, and general construction/installation requirements for distribution equipment.",
+              domains: [.electrical, .processSafety], keywords: ["panelboard", "switchboard", "switchgear", "distribution"]),
+        .init(id: "nec-409", source: .nec, citation: "NEC Article 409",
+              summary: "Industrial control panels: field- and factory-wired panel construction, marking, and short-circuit current rating (SCCR) requirements.",
+              domains: [.electrical, .instrumentation], keywords: ["control panel", "sccr", "short circuit current rating"]),
+        .init(id: "nec-445", source: .nec, citation: "NEC Article 445",
+              summary: "Generators: overcurrent and disconnect requirements, nameplate data requirements, and location/ventilation considerations.",
+              domains: [.electrical, .rotatingEquipment, .processSafety], keywords: ["generator", "genset", "prime mover"]),
+        .init(id: "nec-450", source: .nec, citation: "NEC Article 450",
+              summary: "Transformers: overcurrent protection sizing, ventilation, and installation clearance requirements by transformer type and location.",
+              domains: [.electrical], keywords: ["transformer", "overcurrent protection", "ventilation", "kva"]),
+        .init(id: "nec-501", source: .nec, citation: "NEC Article 501",
+              summary: "Class I locations (flammable gas/vapor atmospheres): wiring methods, seals, and equipment requirements specific to Class I, further subdivided by Division or Zone per the area classification study.",
+              domains: [.naturalGas, .coalMining, .processSafety], keywords: ["class i", "flammable gas", "conduit seal", "explosion proof"]),
+        .init(id: "nec-503", source: .nec, citation: "NEC Article 503",
+              summary: "Class II locations (combustible dust atmospheres): wiring methods and equipment requirements — the relevant classification for a coal-dust-bearing area distinct from the gassy Class I areas underground.",
+              domains: [.coalMining], keywords: ["class ii", "combustible dust", "coal dust"]),
+        .init(id: "nec-504", source: .nec, citation: "NEC Article 504",
+              summary: "Intrinsically safe systems: wiring, separation, and installation requirements for intrinsically safe circuits and associated apparatus used to reduce ignition risk in a classified area.",
+              domains: [.naturalGas, .coalMining, .instrumentation], keywords: ["intrinsically safe", "is barrier", "entity concept"]),
+        .init(id: "nec-505", source: .nec, citation: "NEC Article 505",
+              summary: "Zone 0/1/2 classification system for Class I locations (the IEC-aligned alternative to the Division system in Article 501) — an installation uses one system or the other per its area classification documentation, not a mix.",
+              domains: [.naturalGas, .processSafety], keywords: ["zone 0", "zone 1", "zone 2", "iec classification"]),
 
         // NFPA 70E — energized-work and shock/arc-flash protection
         .init(id: "nfpa70e-120", source: .nfpa70E, citation: "NFPA 70E Article 120",
@@ -77,6 +114,31 @@ public enum EEVeraReferenceIndex {
         .init(id: "nfpa70e-shock-boundaries", source: .nfpa70E, citation: "NFPA 70E Table 130.4(E)(a)",
               summary: "Approach boundaries to exposed energized conductors/parts (limited and restricted approach boundary concept) — the distance values are voltage-dependent and must be read from the adopted edition's table, never assumed from memory.",
               domains: [.electrical, .instrumentation], keywords: ["approach boundary", "limited approach", "restricted approach", "shock protection"]),
+        .init(id: "nfpa70e-100", source: .nfpa70E, citation: "NFPA 70E Article 100",
+              summary: "Definitions specific to electrical safety-related work, including \"qualified person\" as used within 70E's own scope (distinct from, but aligned with, the NEC's Article 100 definition) and the incident energy/arc-flash boundary terms used throughout Article 130.",
+              domains: [.electrical, .instrumentation, .rotatingEquipment], keywords: ["definitions", "qualified person", "arc flash boundary", "incident energy"]),
+        .init(id: "nfpa70e-110", source: .nfpa70E, citation: "NFPA 70E Article 110",
+              summary: "General electrical safety program requirements: the elements an employer's electrical safety program must contain, job briefings before work, and the general principle that de-energized is the default work condition unless an exception applies.",
+              domains: [.electrical, .instrumentation, .rotatingEquipment, .processSafety], keywords: ["safety program", "job briefing", "de-energized default", "training"]),
+        .init(id: "nfpa70e-130.5", source: .nfpa70E, citation: "NFPA 70E 130.5",
+              summary: "The arc-flash risk assessment procedure itself: the two permitted methods (incident energy analysis vs. the PPE category tables), when each applies, and that the assessment must be updated when major system changes occur — not treated as a one-time label.",
+              domains: [.electrical, .instrumentation, .rotatingEquipment], keywords: ["risk assessment", "incident energy analysis", "arc flash label", "ppe category table"]),
+        .init(id: "nfpa70e-205", source: .nfpa70E, citation: "NFPA 70E Article 205",
+              summary: "Safety-related maintenance requirements: the expectation that overcurrent protective devices, enclosures, and other electrical equipment are maintained in a condition that does not increase the hazard, with maintenance intervals and documentation.",
+              domains: [.electrical, .rotatingEquipment, .processSafety], keywords: ["maintenance", "overcurrent device maintenance", "condition of maintenance"]),
+
+        // MSHA — underground coal mining federal regulation (public
+        // regulatory text; summarized in original wording here, same
+        // edition-verification caveat since regulations are amended)
+        .init(id: "msha-75.323", source: .msha, citation: "30 CFR 75.323",
+              summary: "Methane and oxygen monitoring requirements for underground coal mine atmospheres, including the general concept of automatic power de-energization on a methane concentration exceeding the regulatory action level at monitored points — the exact percentage thresholds and monitored locations must be read from the current regulation text, not assumed.",
+              domains: [.coalMining], keywords: ["methane monitoring", "methane percent", "de-energization", "atmosphere monitoring"]),
+        .init(id: "msha-75.1714", source: .msha, citation: "30 CFR 75.1700 / 75.1714",
+              summary: "Self-contained self-rescuer (SCSR) availability and mine-emergency evacuation-equipment requirements for persons underground.",
+              domains: [.coalMining], keywords: ["scsr", "self rescuer", "evacuation", "emergency equipment"]),
+        .init(id: "msha-75-subpart-l", source: .msha, citation: "30 CFR 75 Subpart L",
+              summary: "Ventilation requirements for underground coal mines: approved ventilation plans, minimum air-quantity concepts, and requirements for maintaining a mine's ventilation system as installed rather than as originally designed only.",
+              domains: [.coalMining], keywords: ["ventilation plan", "air quantity", "fan", "airway"]),
 
         // Field quick-reference — general formulas, not tabulated values
         .init(id: "field-voltage-drop", source: .fieldReferenceGuide, citation: "Voltage drop estimate",
@@ -90,7 +152,25 @@ public enum EEVeraReferenceIndex {
               domains: [.electrical], keywords: ["conduit fill", "box fill", "pull", "raceway"]),
         .init(id: "field-loop-power-budget", source: .fieldReferenceGuide, citation: "4-20 mA loop power budget",
               summary: "A 2-wire 4-20 mA loop's available voltage at the field device equals supply voltage minus the sum of every series drop (barrier/isolator, wiring resistance at 20 mA, and any other loop load) — a loop that reads correctly at 4 mA but degrades or dropouts near 20 mA is a classic under-budgeted loop, not a transmitter fault.",
-              domains: [.instrumentation], keywords: ["loop power", "4-20ma", "barrier", "isolator", "dropout"])
+              domains: [.instrumentation], keywords: ["loop power", "4-20ma", "barrier", "isolator", "dropout"]),
+        .init(id: "field-ohms-law-power-triangle", source: .fieldReferenceGuide, citation: "Ohm's law / power triangle",
+              summary: "V = I x R, and P = V x I for DC/resistive loads; for AC, real power P = V x I x cos(theta), where cos(theta) is power factor — a measured current far above what P/V alone predicts is a power-factor or harmonic clue, not necessarily a wiring fault.",
+              domains: [.electrical, .rotatingEquipment], keywords: ["ohms law", "power factor", "power triangle", "reactive power"]),
+        .init(id: "field-three-phase-power", source: .fieldReferenceGuide, citation: "Three-phase power formula",
+              summary: "Three-phase real power P = sqrt(3) x V(line-line) x I(line) x cos(theta) — using the single-phase P=VI formula on a three-phase measurement is a common estimating error worth checking for when a calculated load doesn't match a nameplate or measured value.",
+              domains: [.electrical, .rotatingEquipment], keywords: ["three phase power", "kw calculation", "sqrt3", "line current"]),
+        .init(id: "field-transformer-turns-ratio", source: .fieldReferenceGuide, citation: "Transformer turns ratio",
+              summary: "Primary/secondary voltage ratio equals the turns ratio; current ratio is the inverse. A transformer reading the wrong secondary voltage under load (but correct at no-load) points at loading/regulation or a tap-changer position, not necessarily a winding fault.",
+              domains: [.electrical], keywords: ["turns ratio", "transformer tap", "no load voltage", "regulation"]),
+        .init(id: "field-vibration-severity-zones", source: .fieldReferenceGuide, citation: "ISO 10816/20816 vibration severity zone concept",
+              summary: "Rotating-machine vibration standards define severity zones (from \"newly commissioned\" through \"damage likely\") that depend on machine class and mounting — the exact velocity/displacement thresholds must be read from the applicable ISO 10816/20816 part for the specific machine class, never assumed from a different machine class's table.",
+              domains: [.rotatingEquipment], keywords: ["vibration", "iso 10816", "iso 20816", "severity zone", "mils", "in/s"]),
+        .init(id: "field-insulation-resistance-test", source: .fieldReferenceGuide, citation: "Insulation resistance (megger) test concept",
+              summary: "A megohmmeter test result is only meaningful relative to a baseline for that specific machine/cable at a known temperature and humidity — a single absolute reading without history or a polarization-index trend is a weaker signal than a comparison against the equipment's own prior readings.",
+              domains: [.electrical, .rotatingEquipment], keywords: ["megger", "insulation resistance", "polarization index", "megohm"]),
+        .init(id: "field-full-load-amps-nameplate", source: .fieldReferenceGuide, citation: "Nameplate vs. table current values",
+              summary: "A motor nameplate's FLA reflects the specific tested unit; NEC Table 430 values are standardized figures used for circuit sizing. The two are expected to differ somewhat — treat a large gap between measured current and BOTH values (not just one) as the real anomaly.",
+              domains: [.rotatingEquipment, .electrical], keywords: ["nameplate current", "fla", "flc", "sizing basis"])
     ]
 
     /// Free-text/domain retrieval. Deliberately simple substring matching
@@ -110,5 +190,14 @@ public enum EEVeraReferenceIndex {
         let withMatches = sorted.filter { $0.1 > 0 }.map(\.0)
         let fallback = sorted.map(\.0)
         return Array((withMatches.isEmpty ? fallback : withMatches).prefix(max(0, limit)))
+    }
+
+    /// The full bundled library scoped to one domain, independent of any
+    /// query — lets the player browse everything Vera knows about a domain
+    /// rather than only what a specific symptom's keywords happened to
+    /// match, grouped by source so NEC/NFPA 70E/MSHA/field-reference read as
+    /// separate shelves.
+    public static func library(for domain: EEVeraMentorDomain) -> [EEVeraReferenceSource: [EEVeraCitation]] {
+        Dictionary(grouping: entries.filter { $0.domains.contains(domain) }, by: \.source)
     }
 }

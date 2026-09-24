@@ -43,6 +43,13 @@ checks={
 "runtime attaches citations after the provider, never before the gate":"let citations = EEVeraReferenceIndex.retrieve" in engine and engine.index("EEVeraSafetyRouter.gate(context)") < engine.index("let citations = EEVeraReferenceIndex.retrieve"),
 "reply view surfaces citations with edition-verification disclosure":"vera.citations" in ui and "VERIFY AGAINST YOUR AHJ-ADOPTED EDITION" in ui,
 "tests cover citation retrieval and gate-then-cite ordering":"everyEntryDeclaresAtLeastOneDomainAndKeyword" in tests and "stopVerdictStillReceivesCitations" in tests,
+# Deeper library: MSHA (coal mining federal regulation), more NEC/NFPA
+# 70E breadth, and a query-independent browse view.
+"MSHA source exists for coal mining regulation":'case msha = "MSHA (30 CFR)"' in refindex and "domains: [.coalMining]" in refindex,
+"every domain has at least one library entry":refindex.count("domains: [") >= 25,
+"library() groups by source for query-independent browsing":"static func library(for domain: EEVeraMentorDomain)" in refindex and "Dictionary(grouping:" in refindex,
+"UI exposes the browse-library view":"EEVeraReferenceLibraryView" in ui and "vera.referenceLibrary" in ui,
+"tests cover the expanded library and MSHA citation":"everyDomainHasAtLeastOneLibraryEntry" in tests and "methaneMonitoringQueryFindsMSHACitation" in tests,
 }
 for k,v in checks.items(): print(("PASS" if v else "FAIL"),k)
 raise SystemExit(0 if all(checks.values()) else 1)

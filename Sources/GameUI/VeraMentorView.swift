@@ -19,6 +19,7 @@ struct EEVeraMentorPanel: View {
     @State private var reply: EEVeraMentorReply?
     @State private var configuration = EEVeraMentorStore.loadConfiguration()
     @State private var showAudit = false
+    @State private var showLibrary = false
 
     private var context: EEVeraMentorContext {
         var c = EEVeraMentorContext(domain: domain, symptom: symptom, equipmentID: equipmentID)
@@ -69,6 +70,12 @@ struct EEVeraMentorPanel: View {
                 .buttonStyle(.bordered).accessibilityIdentifier("vera.showAudit")
             if showAudit {
                 EEVeraAuditLogView()
+            }
+
+            Button(showLibrary ? "HIDE REFERENCE LIBRARY" : "BROWSE REFERENCE LIBRARY") { showLibrary.toggle() }
+                .buttonStyle(.bordered).accessibilityIdentifier("vera.showLibrary")
+            if showLibrary {
+                EEVeraReferenceLibraryView(domain: domain)
             }
         }
     }
@@ -139,6 +146,36 @@ private struct EEVeraMentorReplyView: View {
             }
         }
         .accessibilityIdentifier("vera.reply")
+    }
+}
+
+/// The full bundled reference library for one domain, grouped by source
+/// (NEC / NFPA 70E / MSHA / field quick-reference), independent of any
+/// diagnostic query — lets the player browse everything Vera knows about a
+/// domain, not just what a symptom's keywords happened to match.
+@available(iOS 18.0, macOS 15.0, *)
+private struct EEVeraReferenceLibraryView: View {
+    let domain: EEVeraMentorDomain
+
+    var body: some View {
+        let library = EEVeraReferenceIndex.library(for: domain)
+        VStack(alignment: .leading, spacing: 8) {
+            if library.isEmpty {
+                Text("No bundled reference entries for this domain yet.").font(.footnote).foregroundStyle(.secondary)
+            }
+            ForEach(EEVeraReferenceSource.allCases, id: \.self) { source in
+                if let citations = library[source], !citations.isEmpty {
+                    Text(source.rawValue.uppercased()).font(.system(size: 10, weight: .bold)).foregroundStyle(.secondary)
+                    ForEach(citations) { citation in
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(citation.citation).font(.system(size: 11, weight: .semibold, design: .monospaced))
+                            Text(citation.summary).font(.caption2).foregroundStyle(.secondary)
+                        }.padding(.leading, 4)
+                    }
+                }
+            }
+            Text("Reference only — verify against your AHJ-adopted edition.").font(.system(size: 9)).foregroundStyle(.secondary).padding(.top, 2)
+        }.accessibilityIdentifier("vera.referenceLibrary")
     }
 }
 #endif
